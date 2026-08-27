@@ -1,9 +1,10 @@
 /// <reference types="@cloudflare/workers-types" />
 import { RoomDO } from './room';
+import { handlePlan, PlanEnv } from './plan';
 
 export { RoomDO };
 
-interface Env {
+interface Env extends PlanEnv {
   ROOM: DurableObjectNamespace;
   ASSETS: Fetcher;
 }
@@ -49,6 +50,9 @@ export default {
     }
     if (url.pathname.startsWith(HF_PREFIX)) {
       return proxyHuggingFace(request, url, ctx);
+    }
+    if (url.pathname === '/api/plan') {
+      return handlePlan(request, env);
     }
     // Anything else that reached the worker: hand to static assets (SPA fallback).
     return env.ASSETS.fetch(request);

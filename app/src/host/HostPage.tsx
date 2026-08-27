@@ -3,6 +3,9 @@ import QRCode from 'qrcode';
 import { Hub, NodeView } from '../transport/hub';
 import { deviceLabel, makeRoomCode, myPeerId } from '../transport/protocol';
 import { SignalingStatus } from '../transport/signaling';
+import { WebMcpRegistry } from '../webmcp/registry';
+import { installCoreSurface } from '../webmcp/surface';
+import { SurfacePanel } from '../ui/SurfacePanel';
 import { Log, stamp } from '../ui/Log';
 
 function useRoomCode(): string {
@@ -27,16 +30,36 @@ export function HostPage() {
   const hubRef = useRef<Hub | null>(null);
 
   const joinUrl = `${location.origin}/r/${roomCode}`;
+  const registry = useMemo(() => new WebMcpRegistry(), []);
 
   useEffect(() => {
     const hub = new Hub(roomCode, myPeerId(), deviceLabel());
     hubRef.current = hub;
-    hub.on('log', (l) => setLines((prev) => [...prev.slice(-199), stamp(l)]));
+    const addLine = (l: string) => setLines((prev) => [...prev.slice(-199), stamp(l)]);
+    hub.on('log', addLine);
     hub.on('nodes', setNodes);
     hub.on('status', setStatus);
     hub.start();
+    registry.on((e) => {
+      if (e.type === 'registered' && e.origin === 'forged') addLine(`⚡ + ${e.name} REGISTERED via WebMCP`);
+      else if (e.type === 'swapped') addLine(`🔥 ${e.name} hot-swapped → v${e.version}`);
+      else if (e.type === 'revoked') addLine(`− ${e.name} revoked`);
+    });
+    installCoreSurface(registry, hub, {
+      onLog: addLine,
+      onStage: (stage, status, detail) =>
+        addLine(`stage ${stage.id} [${stage.method} @ ${stage.node === 'host' ? 'host' : stage.node}] ${status}${detail ? ` — ${detail}` : ''}`),
+      onArtifact: (a) => {
+        const url = URL.createObjectURL(new Blob([a.bytes.buffer as ArrayBuffer], { type: a.mime }));
+        addLine(`📄 artifact ready: ${a.name} (${(a.bytes.length / 1024).toFixed(0)}KB) — compiled locally`);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = a.name;
+        link.click();
+      },
+    });
     return () => hub.stop();
-  }, [roomCode]);
+  }, [roomCode, registry]);
 
   useEffect(() => {
     QRCode.toDataURL(joinUrl, { width: 320, margin: 1 }).then(setQr).catch(() => {});
@@ -177,6 +200,10 @@ export function HostPage() {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="row" style={{ marginTop: 16 }}>
+        <SurfacePanel registry={registry} />
       </div>
 
       <h2>Log</h2>

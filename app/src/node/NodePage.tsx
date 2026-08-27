@@ -33,6 +33,11 @@ export function NodePage({ roomCode }: { roomCode: string }) {
     agent.register('data.list', (args) => dataList(store, args));
     agent.register('data.read', (args, ctx) => dataRead(store, ctx.link, args));
     agent.register('compute.embed', (args) => embedder.embed(store, args));
+    agent.register('compute.embed_text', async (args) => {
+      const { texts } = args as { texts: string[] };
+      if (!Array.isArray(texts) || texts.length === 0) throw new Error('texts[] required');
+      return { vectors: await embedder.embedTexts(texts) };
+    });
     agent.register('compute.ocr', (args) => ocrFiles(store, args));
     agent.register('human.request', async (args, ctx) => {
       const answer = await human.request(args as HumanRequest);
