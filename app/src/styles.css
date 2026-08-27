@@ -1,0 +1,51 @@
+/* Phase 1: legible, dark, functional. Real design pass happens in Phase 5. */
+:root {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --panel: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --dim: #7d8590;
+  --accent: #58a6ff;
+  --ok: #3fb950;
+  --warn: #d29922;
+  --bad: #f85149;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 ui-monospace, Consolas, monospace;
+}
+#root { max-width: 960px; margin: 0 auto; padding: 20px; }
+h1 { font-size: 18px; margin: 0 0 4px; }
+h2 { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 24px 0 8px; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.row > * { flex: 1 1 280px; }
+button {
+  background: #21262d; color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 14px; font: inherit; cursor: pointer;
+}
+button:hover { background: #30363d; }
+button:disabled { opacity: 0.4; cursor: default; }
+code { color: var(--accent); word-break: break-all; }
+.log {
+  background: #010409; border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px; height: 220px; overflow-y: auto; white-space: pre-wrap; font-size: 12.5px;
+}
+.node-card {
+  border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+  display: flex; flex-direction: column; gap: 6px; background: var(--panel);
+}
+.node-card.stale { opacity: 0.5; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); }
+.badge.p2p { color: var(--ok); border-color: var(--ok); }
+.badge.relay { color: var(--warn); border-color: var(--warn); }
+.badge.status-open { color: var(--ok); border-color: var(--ok); }
+.badge.status-connecting, .badge.status-reconnecting { color: var(--warn); border-color: var(--warn); }
+.badge.status-closed { color: var(--bad); border-color: var(--bad); }
+.qr { background: #fff; padding: 8px; border-radius: 8px; width: 168px; height: 168px; }
+.dim { color: var(--dim); }
+.nodes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
