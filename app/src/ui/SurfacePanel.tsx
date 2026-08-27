@@ -35,6 +35,7 @@ export function SurfacePanel({ registry }: { registry: WebMcpRegistry }) {
             <span className="badge" title={`${t.pipeline?.stages.length ?? '?'} stages`}>
               v{t.version} · {t.pipeline?.stages.length ?? '?'}st
             </span>
+            {t.health === 'degraded' && <span className="badge" style={{ color: 'var(--bad)', borderColor: 'var(--bad)', marginLeft: 4 }}>degraded</span>}
           </span>
           <button style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => registry.revoke(t.def.name)}>revoke</button>
         </p>

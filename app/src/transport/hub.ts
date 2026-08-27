@@ -42,11 +42,18 @@ function rpcTimeout(method: string): number {
   return 10_000;
 }
 
+export interface GraphChange {
+  kind: 'node_lost' | 'node_joined' | 'caps_changed';
+  peerId: PeerId;
+  label: string;
+}
+
 type HubEvents = {
   log: (line: string) => void;
   nodes: (nodes: NodeView[]) => void;
   status: (s: SignalingStatus) => void;
   nodeLost: (peerId: PeerId, label: string) => void;
+  graphChanged: (change: GraphChange) => void;
 };
 
 /** Host-side hub: node registry, RTC answering, heartbeats, RPC with correlation. */
@@ -57,7 +64,7 @@ export class Hub {
   readonly blobs = new BlobReceiver();
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private listeners: { [K in keyof HubEvents]: HubEvents[K][] } = {
-    log: [], nodes: [], status: [], nodeLost: [],
+    log: [], nodes: [], status: [], nodeLost: [], graphChanged: [],
   };
 
   constructor(public roomCode: string, private selfId: PeerId, label: string) {
@@ -151,9 +158,14 @@ export class Hub {
       case 'advertise_capabilities': {
         const entry = env.from !== 'room' ? this.nodes.get(env.from) : undefined;
         if (!entry) return;
+        const before = entry.caps.map((c) => c.id).sort().join('|');
+        const after = env.payload.caps.map((c) => c.id).sort().join('|');
         entry.caps = env.payload.caps;
         entry.lastSeen = Date.now();
         this.emit('log', `${entry.meta.label} advertises: ${entry.caps.map((c) => c.name).join(', ') || '(none)'}`);
+        if (before !== after) {
+          this.emit('graphChanged', { kind: 'caps_changed', peerId: entry.meta.peerId, label: entry.meta.label });
+        }
         this.publishNodes();
         return;
       }
@@ -189,6 +201,7 @@ export class Hub {
           lastSeen: Date.now(),
         });
         this.emit('log', `NODE JOINED: ${peer.label}`);
+        this.emit('graphChanged', { kind: 'node_joined', peerId: peer.peerId, label: peer.label });
       }
     }
     for (const [peerId, entry] of this.nodes) {
@@ -205,6 +218,7 @@ export class Hub {
         }
         this.emit('log', `NODE LOST: ${entry.meta.label}`);
         this.emit('nodeLost', peerId, entry.meta.label);
+        this.emit('graphChanged', { kind: 'node_lost', peerId, label: entry.meta.label });
       }
     }
     this.publishNodes();

@@ -1,8 +1,9 @@
 import { Hub } from '../transport/hub';
-import { Executor, ExecutionEvents } from '../compile/executor';
+import { Executor, ExecutionEvents, ExecutionError } from '../compile/executor';
+import { HotReloadManager } from '../compile/hotReload';
 import { Pipeline } from '../compile/pipeline';
 import { validatePipeline } from '../compile/validate';
-import { WebMcpRegistry } from './registry';
+import { RegisteredTool, WebMcpRegistry } from './registry';
 
 /**
  * The agent-facing surface: four core tools, plus whatever the agent compiles.
@@ -30,22 +31,70 @@ export function installCoreSurface(
   registry: WebMcpRegistry,
   hub: Hub,
   events: SurfaceEvents = {},
-): void {
+): HotReloadManager {
   const log = (l: string) => events.onLog?.(l);
   const executor = new Executor(hub, events);
+  let manager: HotReloadManager;
 
-  const registerCompiled = async (pipeline: Pipeline) => {
+  const registerCompiled = async (pipeline: Pipeline, goal: string) => {
     await registry.register(
       {
         name: pipeline.toolName,
         description: `${pipeline.description} (compiled by the agent at runtime; executes across ${new Set(pipeline.stages.map((s) => s.node)).size} device(s) in this fabric)`,
         inputSchema: pipeline.inputSchema,
-        execute: (args) => executor.run(pipeline, args),
+        execute: async (args) => {
+          try {
+            return await executor.run(pipeline, args);
+          } catch (err) {
+            const e = err as Partial<ExecutionError>;
+            if (!e?.stageId) throw err;
+            // The machine changed under us mid-call: replan and re-run once.
+            log(`execution failed at stage "${e.stageId}" (${e.reason}) — attempting hot reload…`);
+            const swapped = await manager.replanTool(pipeline.toolName);
+            const current = registry.get(pipeline.toolName);
+            if (swapped && current?.health === 'ok') {
+              const result = await current.def.execute(args);
+              return {
+                result,
+                hot_reload: {
+                  version: current.version,
+                  note: 'the device layout changed mid-call; Fabric replanned this tool onto the current devices and re-ran it — same tool, new machine underneath',
+                },
+              };
+            }
+            throw err;
+          }
+        },
       },
       'compiled',
       pipeline,
+      goal,
     );
   };
+
+  const degrade = async (tool: RegisteredTool, reason: string) => {
+    await registry.register(
+      {
+        name: tool.def.name,
+        description: tool.def.description,
+        inputSchema: tool.def.inputSchema,
+        execute: async () => { throw new Error(reason); },
+      },
+      'compiled',
+      tool.pipeline,
+      tool.goal,
+    );
+  };
+
+  manager = new HotReloadManager({
+    hub,
+    registry,
+    plan: planOnce,
+    install: registerCompiled,
+    degrade,
+    onLog: log,
+  });
+  manager.start();
 
   void registry.register({
     name: 'inspect_fabric',
@@ -100,7 +149,7 @@ export function installCoreSurface(
         throw new Error(`could not compile a valid pipeline: ${verdict.errors.join('; ')}`);
       }
 
-      await registerCompiled(pipeline);
+      await registerCompiled(pipeline, goal);
       log(`⚡ ${pipeline.toolName} REGISTERED (${pipeline.stages.length} stages)`);
       return {
         registered: pipeline.toolName,
@@ -160,4 +209,6 @@ export function installCoreSurface(
       return result;
     },
   }, 'core');
+
+  return manager;
 }

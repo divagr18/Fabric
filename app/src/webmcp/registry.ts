@@ -20,6 +20,8 @@ export interface RegisteredTool {
   origin: 'core' | 'compiled';
   pipeline?: Pipeline;
   version: number;
+  goal?: string;           // original compile goal — replanning needs it
+  health: 'ok' | 'degraded';
 }
 
 interface ModelContext {
@@ -37,6 +39,7 @@ export type RegistryEvent =
   | { type: 'registered'; name: string; origin: 'core' | 'compiled'; version: number }
   | { type: 'revoked'; name: string }
   | { type: 'swapped'; name: string; version: number }
+  | { type: 'health'; name: string; health: 'ok' | 'degraded' }
   | { type: 'unavailable' };
 
 export class WebMcpRegistry {
@@ -68,7 +71,14 @@ export class WebMcpRegistry {
     return this.tools.get(name);
   }
 
-  async register(def: WebMcpToolDef, origin: 'core' | 'compiled', pipeline?: Pipeline): Promise<void> {
+  setHealth(name: string, health: 'ok' | 'degraded') {
+    const tool = this.tools.get(name);
+    if (!tool || tool.health === health) return;
+    tool.health = health;
+    this.emit({ type: 'health', name, health });
+  }
+
+  async register(def: WebMcpToolDef, origin: 'core' | 'compiled', pipeline?: Pipeline, goal?: string): Promise<void> {
     const mc = getModelContext();
     if (!mc) {
       this.emit({ type: 'unavailable' });
@@ -91,7 +101,10 @@ export class WebMcpRegistry {
       },
       { signal: controller.signal },
     );
-    this.tools.set(def.name, { def, controller, origin, pipeline, version });
+    this.tools.set(def.name, {
+      def, controller, origin, pipeline, version,
+      goal: goal ?? existing?.goal, health: 'ok',
+    });
     this.emit(version > 1 ? { type: 'swapped', name: def.name, version } : { type: 'registered', name: def.name, origin, version });
   }
 

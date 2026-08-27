@@ -27,6 +27,7 @@ export function HostPage() {
   const [status, setStatus] = useState<SignalingStatus>('connecting');
   const [lines, setLines] = useState<string[]>([]);
   const [qr, setQr] = useState<string>('');
+  const [approval, setApproval] = useState<{ what: string; resolve: (ok: boolean) => void } | null>(null);
   const hubRef = useRef<Hub | null>(null);
 
   const joinUrl = `${location.origin}/r/${roomCode}`;
@@ -47,6 +48,9 @@ export function HostPage() {
     });
     installCoreSurface(registry, hub, {
       onLog: addLine,
+      onApprove: (what) => new Promise<boolean>((resolve) => {
+        setApproval({ what, resolve: (ok) => { setApproval(null); resolve(ok); } });
+      }),
       onStage: (stage, status, detail) =>
         addLine(`stage ${stage.id} [${stage.method} @ ${stage.node === 'host' ? 'host' : stage.node}] ${status}${detail ? ` — ${detail}` : ''}`),
       onArtifact: (a) => {
@@ -208,6 +212,22 @@ export function HostPage() {
 
       <h2>Log</h2>
       <Log lines={lines} />
+
+      {approval && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(1,4,9,0.9)', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }}>
+          <div className="panel" style={{ maxWidth: 420, width: '100%' }}>
+            <h2 style={{ marginTop: 0 }}>Approval needed</h2>
+            <p style={{ fontSize: 16 }}>{approval.what}</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={{ flex: 1 }} onClick={() => approval.resolve(true)}>✓ Approve</button>
+              <button style={{ flex: 1 }} onClick={() => approval.resolve(false)}>✗ Deny</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

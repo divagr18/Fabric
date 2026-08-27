@@ -55,5 +55,44 @@ for (const goal of goals) {
     fail++;
   }
 }
+// Replan case: the phone died; interface is frozen; new plan must avoid ph1.
+{
+  const reducedGraph: CapabilityGraph = { nodes: graph.nodes.filter((n) => n.peerId !== 'ph1') };
+  const fixed = {
+    toolName: 'find_similar_photos',
+    inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'text to match photos against' } }, required: ['query'] },
+  };
+  const canonical = (v: unknown): string => Array.isArray(v)
+    ? `[${v.map(canonical).join(',')}]`
+    : v && typeof v === 'object'
+      ? `{${Object.keys(v as object).sort().map((k) => `${JSON.stringify(k)}:${canonical((v as Record<string, unknown>)[k])}`).join(',')}}`
+      : JSON.stringify(v);
+  const t0 = Date.now();
+  const res = await fetch(`${BASE}/api/plan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      goal: 'Find photos across all connected devices that look similar to a text description I give as input, and return the best 5 matches with scores.',
+      graph: reducedGraph,
+      existingTools: [],
+      fixed,
+    }),
+  });
+  const data = await res.json() as { pipeline?: Pipeline; error?: string };
+  if (!res.ok || !data.pipeline) {
+    console.log(`FAIL  replan — HTTP ${res.status} ${data.error ?? ''}`);
+    fail++;
+  } else {
+    const p = data.pipeline;
+    const verdict = validatePipeline(p, reducedGraph, []);
+    const nameKept = p.toolName === fixed.toolName;
+    const schemaKept = canonical(p.inputSchema) === canonical(fixed.inputSchema);
+    const avoidsLost = p.stages.every((s) => s.node !== 'ph1');
+    const ok = verdict.ok && nameKept && schemaKept && avoidsLost;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  replan (frozen interface, node lost) → [${p.stages.map((s) => `${s.method}@${s.node === 'host' ? 'host' : s.node}`).join(' → ')}] (${Date.now() - t0}ms)${ok ? '' : ` — name:${nameKept} schema:${schemaKept} avoids:${avoidsLost} valid:${verdict.ok ? 'yes' : JSON.stringify((verdict as { errors: string[] }).errors)}`}`);
+    ok ? pass++ : fail++;
+  }
+}
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

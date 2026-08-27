@@ -15,6 +15,8 @@ export interface ExecutionError extends Error {
 export interface ExecutionEvents {
   onStage?: (stage: Stage, status: StageStatus, detail?: string) => void;
   onArtifact?: (artifact: { name: string; mime: string; bytes: Uint8Array }) => void;
+  /** Authority stays human: irreversible outputs need a tap from the host's user. */
+  onApprove?: (what: string) => Promise<boolean>;
 }
 
 function makeExecError(stage: Stage, reason: string): ExecutionError {
@@ -117,6 +119,10 @@ export class Executor {
         const parts = args.parts as Array<{ name?: string; mime?: string; bytes?: Uint8Array; text?: string }>;
         if (!Array.isArray(parts) || parts.length === 0) throw new Error('host.compile_pdf: "parts" must be a non-empty array');
         const title = typeof args.title === 'string' ? args.title : 'Fabric packet';
+        if (this.events.onApprove) {
+          const ok = await this.events.onApprove(`Export "${title}" (${parts.length} item${parts.length === 1 ? '' : 's'}) as a PDF on this device?`);
+          if (!ok) throw new Error('the user declined to export the artifact');
+        }
         const artifact = await compilePdf(title, parts);
         this.events.onArtifact?.(artifact);
         return {

@@ -52,6 +52,9 @@ RULES:
 8. Raw data never leaves the device network; there is no cloud. Do not invent upload/download/network methods.
 
 If prior validation errors are provided, fix exactly those errors and change nothing else.
+
+REPLAN MODE: if a FROZEN INTERFACE is provided, the tool already exists and its interface must not change. Output toolName and inputSchema EXACTLY as given (byte-for-byte). Produce a NEW stage graph using only the CURRENT capability graph — the old plan referenced devices or capabilities that are gone. Preserve the original approach on surviving nodes where possible; move work that was on lost nodes to nodes that still expose the needed methods.
+
 Respond with ONLY the pipeline JSON object.`;
 
 export async function handlePlan(request: Request, env: PlanEnv): Promise<Response> {
@@ -65,6 +68,7 @@ export async function handlePlan(request: Request, env: PlanEnv): Promise<Respon
     existingTools?: string[];
     previousPipeline?: unknown;
     previousErrors?: string[];
+    fixed?: { toolName: string; inputSchema: unknown };
   };
   try { body = await request.json(); } catch { return json({ error: 'invalid JSON body' }, 400); }
   if (!body.goal || !body.graph) return json({ error: 'goal and graph are required' }, 400);
@@ -73,6 +77,9 @@ export async function handlePlan(request: Request, env: PlanEnv): Promise<Respon
     `CAPABILITY GRAPH:\n${JSON.stringify(body.graph, null, 2)}`,
     body.existingTools?.length ? `TOOL NAMES ALREADY TAKEN: ${body.existingTools.join(', ')}` : '',
     body.constraints ? `CONSTRAINTS: ${JSON.stringify(body.constraints)}` : '',
+    body.fixed
+      ? `FROZEN INTERFACE (replan mode — keep exactly):\ntoolName: ${body.fixed.toolName}\ninputSchema: ${JSON.stringify(body.fixed.inputSchema)}`
+      : '',
     `GOAL: ${body.goal}`,
     body.previousErrors?.length
       ? `YOUR PREVIOUS ATTEMPT FAILED VALIDATION.\nPrevious pipeline:\n${JSON.stringify(body.previousPipeline)}\nErrors to fix:\n- ${body.previousErrors.join('\n- ')}`
