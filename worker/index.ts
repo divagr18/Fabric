@@ -32,6 +32,11 @@ async function proxyHuggingFace(request: Request, url: URL, ctx: ExecutionContex
   headers.set('Content-Type', res.headers.get('Content-Type') ?? 'application/octet-stream');
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   headers.set('Access-Control-Allow-Origin', '*');
+  // Preserve length so browsers can report download progress on first fetch.
+  const len = res.headers.get('Content-Length');
+  if (len) headers.set('Content-Length', len);
+  const etag = res.headers.get('ETag');
+  if (etag) headers.set('ETag', etag);
 
   // Tee the stream: one branch to the client now, one into the edge cache.
   const [toClient, toCache] = res.body!.tee();

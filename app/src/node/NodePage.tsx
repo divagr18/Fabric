@@ -126,7 +126,11 @@ export function NodePage({ roomCode }: { roomCode: string }) {
         </div>
         <p className="dim" style={{ marginBottom: 0 }}>
           embed model: {embedStatus.state === 'ready' ? `ready (${embedStatus.backend})`
-            : embedStatus.state === 'loading' ? `downloading ${embedStatus.pct ?? 0}%${embedStatus.mbTotal ? ` (${embedStatus.mb}/${embedStatus.mbTotal} MB)` : ''}`
+            : embedStatus.state === 'loading' ? (
+              embedStatus.pct != null
+                ? `downloading ${embedStatus.pct}% (${embedStatus.mb}/${embedStatus.mbTotal} MB)`
+                : `downloading… ${embedStatus.mb ?? 0} MB so far`
+            )
             : embedStatus.state === 'error' ? `error — ${embedStatus.error}`
             : 'downloads when you share files'}
         </p>

@@ -5,7 +5,7 @@ import { GrantStore, isImage } from './grants';
 
 export type EmbedStatus =
   | { state: 'idle' }
-  | { state: 'loading'; pct: number; mb?: number; mbTotal?: number }
+  | { state: 'loading'; pct: number | null; mb?: number; mbTotal?: number | null }
   | { state: 'ready'; backend: 'webgpu' | 'wasm' }
   | { state: 'error'; error: string };
 
@@ -29,7 +29,7 @@ export class Embedder {
     if (this.worker) return this.worker;
     const w = new Worker(new URL('./embed.worker.ts', import.meta.url), { type: 'module' });
     w.onmessage = (ev) => {
-      const msg = ev.data as { type: string; id?: string; pct?: number; mb?: number; mbTotal?: number; result?: unknown; error?: string };
+      const msg = ev.data as { type: string; id?: string; pct?: number | null; mb?: number; mbTotal?: number | null; result?: unknown; error?: string };
       if (msg.type === 'progress') {
         if (this.status.state !== 'ready') {
           this.setStatus({ state: 'loading', pct: msg.pct ?? 0, mb: msg.mb, mbTotal: msg.mbTotal });
@@ -57,7 +57,7 @@ export class Embedder {
 
   async warmup(): Promise<void> {
     if (this.status.state === 'ready') return;
-    if (this.status.state === 'idle') this.setStatus({ state: 'loading', pct: 0 });
+    if (this.status.state === 'idle') this.setStatus({ state: 'loading', pct: null });
     try {
       const { backend } = (await this.call('warmup')) as { backend: 'webgpu' | 'wasm' };
       this.setStatus({ state: 'ready', backend });

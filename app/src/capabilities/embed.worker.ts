@@ -44,8 +44,8 @@ function post(msg: unknown) {
 // bytes across all files so the reported percentage only ever moves forward.
 const fileProgress = new Map<string, { loaded: number; total: number }>();
 function progress_callback(p: { status?: string; file?: string; loaded?: number; total?: number }) {
-  if (p.status !== 'progress' || !p.file || typeof p.loaded !== 'number' || !p.total) return;
-  fileProgress.set(p.file, { loaded: p.loaded, total: p.total });
+  if (p.status !== 'progress' || !p.file || typeof p.loaded !== 'number') return;
+  fileProgress.set(p.file, { loaded: p.loaded, total: p.total ?? 0 });
   let loaded = 0, total = 0;
   for (const f of fileProgress.values()) {
     loaded += f.loaded;
@@ -53,9 +53,10 @@ function progress_callback(p: { status?: string; file?: string; loaded?: number;
   }
   post({
     type: 'progress',
-    pct: Math.min(99, Math.round((100 * loaded) / total)),
+    // no totals (missing Content-Length) → indeterminate: report bytes, not a fake %
+    pct: total > 0 ? Math.min(99, Math.round((100 * loaded) / total)) : null,
     mb: +(loaded / 1048576).toFixed(1),
-    mbTotal: +(total / 1048576).toFixed(1),
+    mbTotal: total > 0 ? +(total / 1048576).toFixed(1) : null,
   });
 }
 
