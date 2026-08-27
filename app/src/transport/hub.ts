@@ -1,33 +1,46 @@
-import { CapabilityStub, Envelope, PeerId, PeerMeta } from './protocol';
+import { Capability, Envelope, PeerId, PeerMeta } from './protocol';
 import { PeerLink, ChannelKind } from './channel';
+import { BlobReceiver } from './blob';
 import { RtcSession } from './rtc';
 import { Signaling, SignalingStatus } from './signaling';
 
 export interface NodeView {
   peerId: PeerId;
   label: string;
-  caps: CapabilityStub[];
+  caps: Capability[];
   kind: ChannelKind;
   alive: boolean;
   lastSeen: number;
 }
 
+/** Snapshot of everything every node currently exposes — Phase 3's planner input. */
+export interface CapabilityGraph {
+  nodes: Array<{ peerId: PeerId; label: string; online: boolean; caps: Capability[] }>;
+}
+
 interface NodeEntry {
   meta: PeerMeta;
   link: PeerLink;
-  caps: CapabilityStub[];
+  caps: Capability[];
   lastSeen: number;
 }
 
 interface Pending {
+  peerId: PeerId;
   resolve: (v: unknown) => void;
   reject: (e: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 }
 
-const RPC_TIMEOUT_MS = 10_000;
 const HEARTBEAT_MS = 3_000;
 const STALE_MS = 8_000;
+
+/** Per-method RPC budgets: humans take minutes, models take a while, everything else is quick. */
+function rpcTimeout(method: string): number {
+  if (method.startsWith('human.')) return 300_000;
+  if (method.startsWith('compute.')) return 120_000;
+  return 10_000;
+}
 
 type HubEvents = {
   log: (line: string) => void;
@@ -41,6 +54,7 @@ export class Hub {
   private signaling: Signaling;
   private nodes = new Map<PeerId, NodeEntry>();
   private pending = new Map<string, Pending>();
+  readonly blobs = new BlobReceiver();
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private listeners: { [K in keyof HubEvents]: HubEvents[K][] } = {
     log: [], nodes: [], status: [], nodeLost: [],
@@ -95,7 +109,21 @@ export class Hub {
     this.publishNodes(); // refreshes alive/kind badges
   }
 
+  /** Current capability graph across all online nodes (planner input in Phase 3). */
+  getGraph(): CapabilityGraph {
+    const now = Date.now();
+    return {
+      nodes: [...this.nodes.values()].map((e) => ({
+        peerId: e.meta.peerId,
+        label: e.meta.label,
+        online: now - e.lastSeen < STALE_MS,
+        caps: e.caps,
+      })),
+    };
+  }
+
   private handle(env: Envelope) {
+    if (this.blobs.handle(env)) return;
     switch (env.type) {
       case 'roster':
         this.syncRoster(env.payload.peers);
@@ -167,6 +195,14 @@ export class Hub {
       if (!present.has(peerId)) {
         entry.link.close();
         this.nodes.delete(peerId);
+        // fail in-flight RPCs to this node immediately — no waiting out long compute/human budgets
+        for (const [id, p] of this.pending) {
+          if (p.peerId === peerId) {
+            this.pending.delete(id);
+            clearTimeout(p.timer);
+            p.reject(new Error(`node ${entry.meta.label} left mid-call`));
+          }
+        }
         this.emit('log', `NODE LOST: ${entry.meta.label}`);
         this.emit('nodeLost', peerId, entry.meta.label);
       }
@@ -182,8 +218,8 @@ export class Hub {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`rpc ${method} → ${entry.meta.label} timed out`));
-      }, RPC_TIMEOUT_MS);
-      this.pending.set(id, { resolve, reject, timer });
+      }, rpcTimeout(method));
+      this.pending.set(id, { peerId, resolve, reject, timer });
       entry.link.send({ type: 'rpc_request', payload: { method, args } }, id);
     });
   }

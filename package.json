@@ -11,9 +11,11 @@
     "typecheck:worker": "tsc -p worker/tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260827.1",

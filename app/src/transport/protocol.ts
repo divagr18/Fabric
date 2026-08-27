@@ -9,16 +9,24 @@ export interface PeerMeta {
   joinedAt: number;
 }
 
-export interface CapabilityStub {
-  name: string; // Phase 1: 'echo'; Phase 2 replaces with real capability descriptors
+/** A capability a node has explicitly exposed. Copy rule: detail always says "shared"/"selected", never "has". */
+export interface Capability {
+  id: string;                       // stable per grant, e.g. 'data:documents'
+  kind: 'data' | 'compute' | 'human';
+  name: string;                     // 'documents/' | 'embed (webgpu)' | 'human'
+  detail: string;                   // '3,182 files shared'
+  methods: string[];                // primitives this capability serves
 }
 
 export type Message =
   | { type: 'roster'; payload: { peers: PeerMeta[] } }
   | { type: 'signal'; payload: { kind: 'offer'; sdp: string } | { kind: 'answer'; sdp: string } | { kind: 'ice'; candidate: RTCIceCandidateInit } }
-  | { type: 'advertise_capabilities'; payload: { caps: CapabilityStub[] } }
+  | { type: 'advertise_capabilities'; payload: { caps: Capability[] } }
   | { type: 'rpc_request'; payload: { method: string; args: unknown } }
   | { type: 'rpc_response'; payload: { ok: true; result: unknown } | { ok: false; error: string } }
+  | { type: 'blob_begin'; payload: { transferId: string; name: string; mime: string; size: number } }
+  | { type: 'blob_chunk'; payload: { transferId: string; seq: number; dataB64: string } }
+  | { type: 'blob_end'; payload: { transferId: string; chunks: number } }
   | { type: 'ping'; payload: Record<string, never> }
   | { type: 'pong'; payload: Record<string, never> };
 

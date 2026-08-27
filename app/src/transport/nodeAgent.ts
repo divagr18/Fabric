@@ -1,7 +1,9 @@
-import { CapabilityStub, Envelope, PeerId } from './protocol';
+import { Capability, Envelope, PeerId } from './protocol';
 import { PeerLink, ChannelKind, forceRelay } from './channel';
 import { RtcSession } from './rtc';
 import { Signaling, SignalingStatus } from './signaling';
+
+export type PrimitiveHandler = (args: unknown, ctx: { link: PeerLink }) => Promise<unknown> | unknown;
 
 type NodeEvents = {
   log: (line: string) => void;
@@ -9,17 +11,18 @@ type NodeEvents = {
   kind: (k: ChannelKind) => void;
 };
 
-/** Node-side agent: joins the room, advertises capabilities, answers pings and RPCs. */
+/** Node-side agent: joins the room, advertises granted capabilities, dispatches primitive RPCs. */
 export class NodeAgent {
   private signaling: Signaling;
   private link: PeerLink;
+  private handlers = new Map<string, PrimitiveHandler>();
   private listeners: { [K in keyof NodeEvents]: NodeEvents[K][] } = { log: [], status: [], kind: [] };
 
   constructor(
     public roomCode: string,
     private selfId: PeerId,
     private label: string,
-    private caps: CapabilityStub[],
+    private getCaps: () => Capability[],
   ) {
     this.signaling = new Signaling(roomCode, selfId, 'node', label);
     this.link = new PeerLink(selfId, 'host', this.signaling);
@@ -38,6 +41,10 @@ export class NodeAgent {
     for (const cb of this.listeners[event]) (cb as (...a: unknown[]) => void)(...args);
   }
 
+  register(method: string, handler: PrimitiveHandler) {
+    this.handlers.set(method, handler);
+  }
+
   start() {
     this.signaling.connect();
   }
@@ -51,8 +58,13 @@ export class NodeAgent {
     return this.link.kind;
   }
 
+  /** Re-advertise current capabilities (call on every grant change). */
+  advertise() {
+    this.link.send({ type: 'advertise_capabilities', payload: { caps: this.getCaps() } });
+  }
+
   private onConnected() {
-    this.link.send({ type: 'advertise_capabilities', payload: { caps: this.caps } });
+    this.advertise();
     this.emit('log', `joined room ${this.roomCode} as ${this.label}`);
     if (!forceRelay() && !this.link.rtc) {
       const rtc = new RtcSession({
@@ -81,24 +93,27 @@ export class NodeAgent {
       case 'ping':
         this.link.send({ type: 'pong', payload: {} });
         return;
-      case 'rpc_request': {
-        const { method, args } = env.payload;
-        if (method === 'echo') {
-          this.emit('log', `echo ← host: ${JSON.stringify(args)}`);
-          this.link.send(
-            { type: 'rpc_response', payload: { ok: true, result: { echo: args, from: this.label, at: Date.now() } } },
-            env.id,
-          );
-        } else {
-          this.link.send(
-            { type: 'rpc_response', payload: { ok: false, error: `unknown method ${method}` } },
-            env.id,
-          );
-        }
+      case 'rpc_request':
+        void this.dispatch(env);
         return;
-      }
       default:
         return;
+    }
+  }
+
+  private async dispatch(env: Envelope & { type: 'rpc_request' }) {
+    const { method, args } = env.payload;
+    const handler = this.handlers.get(method);
+    try {
+      if (!handler) throw new Error(`this node does not serve ${method}`);
+      this.emit('log', `→ ${method}`);
+      const result = await handler(args, { link: this.link });
+      this.link.send({ type: 'rpc_response', payload: { ok: true, result } }, env.id);
+      this.emit('log', `✓ ${method}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.link.send({ type: 'rpc_response', payload: { ok: false, error: message } }, env.id);
+      this.emit('log', `✗ ${method}: ${message}`);
     }
   }
 }
