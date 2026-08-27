@@ -11,11 +11,15 @@ export interface FileEntry {
 
 /** data.list — file listing for one granted capability (metadata only, no bytes). */
 export function dataList(store: GrantStore, args: unknown): { files: FileEntry[] } {
-  const { capId } = args as { capId: string };
-  const grant = store.getGrant(capId);
-  if (!grant) throw new Error(`no grant ${capId} — the user has not shared it`);
+  const { capId } = args as { capId?: string };
+  // A stale/unknown capId (grants change between compile-time and call-time)
+  // degrades to everything currently granted — still consent-only.
+  const files = capId && store.getGrant(capId)
+    ? store.getGrant(capId)!.files
+    : store.list().flatMap((g) => g.files);
+  if (files.length === 0) throw new Error('nothing is shared on this node yet');
   return {
-    files: grant.files.map((f) => ({ id: f.id, name: f.name, mime: f.mime, image: isImage(f.name) })),
+    files: files.map((f) => ({ id: f.id, name: f.name, mime: f.mime, image: isImage(f.name) })),
   };
 }
 

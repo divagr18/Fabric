@@ -70,11 +70,15 @@ export class Embedder {
   /** compute.embed handler: embeds granted images by fileId (or all images in a capId). */
   async embed(store: GrantStore, args: unknown): Promise<{ items: { fileId: string; vector: number[] }[]; backend: string; ms: number }> {
     const { capId, fileIds, limit } = args as { capId?: string; fileIds?: string[]; limit?: number };
-    let targets = fileIds
+    let targets = fileIds?.length
       ? fileIds.map((id) => store.getFile(id)).filter((f): f is NonNullable<typeof f> => !!f)
-      : (capId ? store.getGrant(capId)?.files ?? [] : []).filter((f) => isImage(f.name));
+      : (capId && store.getGrant(capId) ? store.getGrant(capId)!.files : store.list().flatMap((g) => g.files))
+          .filter((f) => isImage(f.name));
     if (limit && limit > 0) targets = targets.slice(0, limit);
-    if (targets.length === 0) throw new Error('no granted image files matched');
+    if (targets.length === 0) {
+      const shared = store.list().map((g) => `${g.capId} (${g.files.filter((f) => isImage(f.name)).length} images)`).join(', ');
+      throw new Error(`no granted image files matched — this node currently shares: ${shared || 'nothing'}`);
+    }
     await this.warmup();
     const files = await Promise.all(targets.map((t) => t.getFile()));
     const { vectors, backend, ms } = (await this.call('embedImages', { files })) as {
