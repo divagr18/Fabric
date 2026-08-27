@@ -58,11 +58,18 @@
 | B4 | Multi-photo pick OK | ☐ | |
 | B5 | Vibration OK (or iOS → sound fallback) | ☐ | |
 
-## Decision (fill after matrix)
-- [ ] **GO — full spec** (A2 pass: mid-conversation registration)
-- [ ] **GO — next-turn choreography** (A3 pass: forge lands on next message; adjust video §11 pacing only)
-- [ ] **GO — refresh-nudge fallback** (A4 only: core tool returns "refresh tools" instruction)
-- [ ] **RESTRUCTURE** (none pass: pre-registered names + hot-swapped implementations; leverage story = stable-schema hot reload; rewrite video before Phase 1)
+## Decision — RECORDED Aug 27, 2026
 
-Cross-vendor beat: ☐ keep / ☐ cut (from C4)
-Phone for demo: ☐ device: ____________
+**Manual test run (user-executed): ALL TESTS PASSED.**
+- ChatGPT in-app browser: `fabric_ping` verified by token; forged tool visible and callable mid-session; hot-swap returned v2 secret under the same tool name; revoke failed cleanly. (A1–A7 ✅)
+- Chrome 151 + `#enable-webmcp-testing` flag: `document.modelContext` present, DevTools WebMCP panel reflects forge/swap/revoke. (C1–C3 ✅)
+- Phone: capability probes passed. (B ✅)
+
+- [x] **GO — full spec** (mid-conversation registration works)
+- [ ] ~~next-turn choreography~~ · [ ] ~~refresh-nudge fallback~~ · [ ] ~~RESTRUCTURE~~
+
+Consequences:
+- Video §11 cold open stays exactly as scripted — tool appears in ChatGPT's list mid-conversation.
+- Hot reload uses AbortController revoke + re-register under the same name — platform-native, demo-proven.
+- Cross-vendor (C4/Gemini): still optional, 2h timebox during Phase 3–4 slack only.
+- **Phase 0 CLOSED. Phase 1 (scaffold + transport) is unblocked.**
