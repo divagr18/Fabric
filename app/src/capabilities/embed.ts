@@ -97,7 +97,7 @@ export class Embedder {
       kind: 'compute',
       name: `embed (${backend})`,
       detail: 'CLIP image/text embeddings, computed on this device',
-      methods: ['compute.embed'],
+      methods: ['compute.embed', 'compute.embed_text'],
     };
   }
 }

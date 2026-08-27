@@ -44,10 +44,10 @@ HOST OPS (node = "host", run on the coordinating device):
 RULES:
 1. Bind every node stage to a peerId from the graph that is online AND exposes that method. Use the peerId exactly, never the label.
 2. Data gravity: run compute.embed / compute.ocr on the node that shares the data. Move vectors and text between devices, not files, unless the goal requires the file itself.
-3. Use human.request when the goal needs something physical (photograph a paper document), a judgment call, or an approval. Write prompts a person can act on.
+3. human.request is ONLY for what machines cannot do: physical-world actions (photograph a paper document), judgment calls between options, approvals. NEVER use it for search, similarity, matching, or extraction — compute primitives do those. Every human.request MUST have a specific, actionable "prompt" string; a person reads it.
 4. Stages with no dependency between them run concurrently — only add dependsOn (or $from, which implies it) when truly needed.
 5. Keep it minimal: no more than 10 stages, no stages the goal doesn't need.
-6. Text-to-image similarity: compute.embed_text for the query, compute.embed for the images, host.match to rank (vectors share a space).
+6. Any "find/search/similar/matching images" goal means: compute.embed_text for the query text, compute.embed for each node's images, host.match to rank (CLIP vectors share one space). This is fully automatic — no human involved.
 7. inputSchema must declare every {"$input"} field used. Prefer few, meaningful inputs.
 8. Raw data never leaves the device network; there is no cloud. Do not invent upload/download/network methods.
 

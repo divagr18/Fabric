@@ -49,8 +49,9 @@ export function validatePipeline(
         errors.push(`${where}: node "${stage.node}" is not in the fabric (nodes: ${graph.nodes.map((n) => `${n.peerId}=${n.label}`).join(', ')})`);
       } else {
         if (!node.online) errors.push(`${where}: node "${node.label}" is offline`);
-        const rpcMethod = method === 'compute.embed_text' ? 'compute.embed' : method;
-        const serves = node.caps.some((c) => c.methods.includes(rpcMethod));
+        // embed_text rides the same model as embed — accept either advertisement
+        const serves = node.caps.some((c) => c.methods.includes(method))
+          || (method === 'compute.embed_text' && node.caps.some((c) => c.methods.includes('compute.embed')));
         if (!serves) {
           errors.push(`${where}: node "${node.label}" does not expose ${stage.method} (it exposes: ${[...new Set(node.caps.flatMap((c) => c.methods))].join(', ') || 'nothing'})`);
         }
