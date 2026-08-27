@@ -54,6 +54,11 @@ export default {
     if (url.pathname === '/api/plan') {
       return handlePlan(request, env);
     }
+    // A hashed asset that missed means a stale cached index.html — 404 beats
+    // serving HTML as JS (MIME error, blank page).
+    if (url.pathname.startsWith('/assets/')) {
+      return new Response('stale asset — reload the page', { status: 404 });
+    }
     // Anything else that reached the worker: hand to static assets (SPA fallback).
     return env.ASSETS.fetch(request);
   },
