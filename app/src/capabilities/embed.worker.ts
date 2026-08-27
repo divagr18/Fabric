@@ -100,16 +100,23 @@ async function loadText(): Promise<void> {
   text = await CLIPTextModelWithProjection.from_pretrained(MODEL, { dtype: 'q8', progress_callback });
 }
 
-async function embedImages(files: File[]): Promise<number[][]> {
+async function embedImages(files: File[]): Promise<{ vectors: Array<number[] | null>; skipped: string[] }> {
   await loadVision();
-  const out: number[][] = [];
+  const vectors: Array<number[] | null> = [];
+  const skipped: string[] = [];
   for (const file of files) {
-    const image = await RawImage.fromBlob(file);
-    const inputs = await processor!(image);
-    const { image_embeds } = await vision!(inputs);
-    out.push([...(image_embeds.normalize().data as Float32Array)]);
+    try {
+      const image = await RawImage.fromBlob(file);
+      const inputs = await processor!(image);
+      const { image_embeds } = await vision!(inputs);
+      vectors.push([...(image_embeds.normalize().data as Float32Array)]);
+    } catch {
+      // undecodable format (HEIC etc.) — skip the file, not the stage
+      vectors.push(null);
+      skipped.push(file.name || 'unnamed');
+    }
   }
-  return out;
+  return { vectors, skipped };
 }
 
 async function embedTexts(texts: string[]): Promise<number[][]> {
@@ -132,8 +139,8 @@ self.onmessage = async (ev: MessageEvent) => {
       post({ type: 'result', id, result: { backend } });
     } else if (op === 'embedImages') {
       const t0 = performance.now();
-      const vectors = await embedImages(files ?? []);
-      post({ type: 'result', id, result: { vectors, backend, ms: Math.round(performance.now() - t0) } });
+      const { vectors, skipped } = await embedImages(files ?? []);
+      post({ type: 'result', id, result: { vectors, skipped, backend, ms: Math.round(performance.now() - t0) } });
     } else if (op === 'embedTexts') {
       const vectors = await embedTexts(texts ?? []);
       post({ type: 'result', id, result: { vectors, backend } });

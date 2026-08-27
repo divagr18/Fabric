@@ -68,23 +68,30 @@ export class Embedder {
   }
 
   /** compute.embed handler: embeds granted images by fileId (or all images in a capId). */
-  async embed(store: GrantStore, args: unknown): Promise<{ items: { fileId: string; vector: number[] }[]; backend: string; ms: number }> {
+  async embed(store: GrantStore, args: unknown): Promise<{ items: { fileId: string; name: string; vector: number[] }[]; skipped?: string[]; backend: string; ms: number }> {
     const { capId, fileIds, limit } = args as { capId?: string; fileIds?: string[]; limit?: number };
+    const looksImage = (f: { name: string; mime: string }) => isImage(f.name) || f.mime.startsWith('image/');
     let targets = fileIds?.length
       ? fileIds.map((id) => store.getFile(id)).filter((f): f is NonNullable<typeof f> => !!f)
       : (capId && store.getGrant(capId) ? store.getGrant(capId)!.files : store.list().flatMap((g) => g.files))
-          .filter((f) => isImage(f.name));
+          .filter(looksImage);
     if (limit && limit > 0) targets = targets.slice(0, limit);
     if (targets.length === 0) {
-      const shared = store.list().map((g) => `${g.capId} (${g.files.filter((f) => isImage(f.name)).length} images)`).join(', ');
+      const shared = store.list().map((g) => `${g.capId} (${g.files.filter(looksImage).length} images)`).join(', ');
       throw new Error(`no granted image files matched — this node currently shares: ${shared || 'nothing'}`);
     }
     await this.warmup();
     const files = await Promise.all(targets.map((t) => t.getFile()));
-    const { vectors, backend, ms } = (await this.call('embedImages', { files })) as {
-      vectors: number[][]; backend: string; ms: number;
+    const { vectors, skipped, backend, ms } = (await this.call('embedImages', { files })) as {
+      vectors: Array<number[] | null>; skipped: string[]; backend: string; ms: number;
     };
-    return { items: targets.map((t, i) => ({ fileId: t.id, vector: vectors[i] })), backend, ms };
+    const items = targets
+      .map((t, i) => ({ fileId: t.id, name: t.name, vector: vectors[i] }))
+      .filter((it): it is { fileId: string; name: string; vector: number[] } => it.vector !== null);
+    if (items.length === 0) {
+      throw new Error(`none of the ${targets.length} shared image(s) could be decoded (unsupported format, e.g. HEIC): ${skipped.slice(0, 5).join(', ')}`);
+    }
+    return { items, skipped: skipped.length ? skipped : undefined, backend, ms };
   }
 
   async embedTexts(texts: string[]): Promise<number[][]> {
