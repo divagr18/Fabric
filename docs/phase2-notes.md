@@ -20,7 +20,9 @@ Live URL: https://fabric.keshav-agr2007.workers.dev
 - Phone screen sleeping drops the node (NODE LOST ~5 min after join) — expected browser behavior; demo phones should keep screen on. Consider a wake-lock (`navigator.wakeLock`) in Phase 5 polish.
 - First-run model download needs decent network; pre-warm demo devices before recording.
 
-## Outstanding gate items (user to confirm)
-- [ ] phone `human.request capture` (buzz → photo → blob at host)
-- [ ] phone `human.request approve`
-- [ ] kill node tab mid-`embed` → clean immediate failure at host
+## Gate items — all confirmed (user-verified)
+- [x] phone `human.request capture` (buzz → photo → blob at host)
+- [x] phone `human.request approve`
+- [x] kill node tab mid-`embed` → clean immediate failure at host
+
+**Phase 2 CLOSED.**
