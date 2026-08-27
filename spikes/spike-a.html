@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fabric Spike A — WebMCP Dynamic Registration</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0d1117; color:#e6edf3; font:14px/1.5 ui-monospace,Consolas,monospace; padding:24px; max-width:900px; margin-inline:auto; }
+  h1 { font-size:18px; } h2 { font-size:14px; color:#7d8590; text-transform:uppercase; letter-spacing:.08em; margin-top:28px; }
+  .ok { color:#3fb950; } .bad { color:#f85149; } .warn { color:#d29922; }
+  button { background:#21262d; color:#e6edf3; border:1px solid #30363d; border-radius:6px; padding:10px 16px; font:inherit; cursor:pointer; margin:4px 8px 4px 0; }
+  button:hover { background:#30363d; } button:disabled { opacity:.4; cursor:default; }
+  #log { background:#010409; border:1px solid #30363d; border-radius:6px; padding:12px; height:320px; overflow-y:auto; white-space:pre-wrap; font-size:12.5px; }
+  #tools, #probe { background:#161b22; border:1px solid #30363d; border-radius:6px; padding:12px; }
+  .callflash { animation: flash 1s; } @keyframes flash { 0% { background:#1f6feb; } 100% { background:#010409; } }
+  code { color:#79c0ff; }
+  .script { background:#161b22; border-left:3px solid #1f6feb; padding:10px 14px; margin:8px 0; }
+</style>
+</head>
+<body>
+<h1>Fabric — Spike A: dynamic WebMCP tool registration</h1>
+
+<h2>1 · Environment probe</h2>
+<div id="probe">probing…</div>
+
+<h2>2 · Actions</h2>
+<div>
+  <button id="btnForge">FORGE: register <code>fabric_secret_number</code></button>
+  <button id="btnSwap" disabled>HOT-SWAP: re-register same name, new behavior (v2)</button>
+  <button id="btnRevoke" disabled>REVOKE: unregister it</button>
+</div>
+
+<h2>3 · Currently registered by this page</h2>
+<div id="tools">—</div>
+
+<h2>4 · Live log (tool calls flash blue)</h2>
+<div id="log"></div>
+
+<h2>5 · Test script — run against ChatGPT / the agent</h2>
+<div class="script">① With ONLY the static tool present, ask: <b>"What tools does this page offer? Call fabric_ping and tell me exactly what it returns."</b><br>
+→ Expect the ping token below. Proves baseline WebMCP works.</div>
+<div class="script">② Ask: <b>"Do you see a tool called fabric_secret_number?"</b> → expect NO. Now click <b>FORGE</b> (while the conversation stays open). Ask: <b>"Check again — call fabric_secret_number if you see it now."</b><br>
+→ If it returns the v1 secret <b>without you refreshing anything</b>: mid-session registration WORKS (best case).<br>
+→ If it only appears after your next message / a refresh: note exactly what it took.</div>
+<div class="script">③ Click <b>HOT-SWAP</b>. Ask: <b>"Call fabric_secret_number again."</b><br>
+→ v2 secret returned = hot reload under a stable name WORKS.</div>
+<div class="script">④ Click <b>REVOKE</b>. Ask: <b>"Call fabric_secret_number one more time."</b><br>
+→ Expect a clean failure / tool gone.</div>
+
+<script>
+(() => {
+  const logEl = document.getElementById('log');
+  const toolsEl = document.getElementById('tools');
+  const probeEl = document.getElementById('probe');
+  const registered = new Map(); // name -> AbortController
+
+  function log(msg, cls) {
+    const t = new Date().toTimeString().slice(0,8);
+    const line = document.createElement('div');
+    if (cls) line.className = cls;
+    line.textContent = `[${t}] ${msg}`;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function flashLog() {
+    logEl.classList.remove('callflash'); void logEl.offsetWidth; logEl.classList.add('callflash');
+  }
+  function renderTools() {
+    toolsEl.textContent = registered.size
+      ? [...registered.keys()].map(n => '● ' + n).join('\n')
+      : '(only fabric_ping)';
+  }
+
+  // ---- Environment probe: which API surface exists? ----
+  const mc = document.modelContext || navigator.modelContext;
+  const where = document.modelContext ? 'document.modelContext'
+              : navigator.modelContext ? 'navigator.modelContext' : null;
+  const probeLines = [];
+  probeLines.push(`secure context: ${window.isSecureContext ? '<span class="ok">yes</span>' : '<span class="bad">NO — WebMCP needs HTTPS or localhost</span>'}`);
+  if (!mc) {
+    probeLines.push('<span class="bad">✗ modelContext NOT FOUND on document or navigator.</span>');
+    probeLines.push('In Chrome: enable <code>chrome://flags/#enable-webmcp-testing</code> and relaunch (Chrome 149–156).');
+    probeLines.push('In ChatGPT: open this URL inside ChatGPT’s in-app browser.');
+  } else {
+    probeLines.push(`<span class="ok">✓ modelContext found at <code>${where}</code></span>`);
+    for (const m of ['registerTool','provideContext','getTools','executeTool','addEventListener']) {
+      probeLines.push(`${typeof mc[m] === 'function' ? '<span class="ok">✓</span>' : '<span class="warn">–</span>'} ${m}: ${typeof mc[m]}`);
+    }
+  }
+  probeLines.push(`userAgent: ${navigator.userAgent}`);
+  probeEl.innerHTML = probeLines.join('<br>');
+
+  if (!mc) { log('No modelContext API — fix environment, reload.', 'bad'); return; }
+
+  // toolchange listener — does the browser tell agents the list mutated?
+  try {
+    mc.addEventListener?.('toolchange', () => log('EVENT: toolchange fired', 'ok'));
+  } catch (e) { log('toolchange listener failed: ' + e.message, 'warn'); }
+
+  // ---- Registration helper: prefer registerTool, fall back to provideContext ----
+  async function register(def) {
+    const controller = new AbortController();
+    if (typeof mc.registerTool === 'function') {
+      await mc.registerTool(def, { signal: controller.signal });
+      registered.set(def.name, controller);
+      log(`registerTool("${def.name}") OK`, 'ok');
+    } else if (typeof mc.provideContext === 'function') {
+      // provideContext replaces the whole set — rebuild from current map + new def
+      registered.set(def.name, controller);
+      await mc.provideContext({ tools: currentDefs() });
+      log(`provideContext with "${def.name}" OK (fallback path)`, 'ok');
+    } else {
+      throw new Error('No registration method available');
+    }
+    renderTools();
+    return controller;
+  }
+
+  const defs = new Map(); // name -> def, for provideContext fallback rebuilds
+  function currentDefs() { return [...registered.keys()].map(n => defs.get(n)).filter(Boolean); }
+
+  function makeDef(name, description, result) {
+    const def = {
+      name, description,
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      async execute() {
+        flashLog();
+        log(`TOOL CALLED: ${name} → "${result}"`, 'ok');
+        return { content: [{ type: 'text', text: result }] };
+      }
+    };
+    defs.set(name, def);
+    return def;
+  }
+
+  // ---- Static baseline tool ----
+  const pingToken = 'PING-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  document.title += ' · ' + pingToken;
+  register(makeDef('fabric_ping',
+    'Health check for the Fabric spike page. Returns a unique token proving real execution.',
+    `pong ${pingToken}`))
+    .then(() => log(`static tool live — ping token is ${pingToken}`))
+    .catch(e => log('static registration FAILED: ' + e.message, 'bad'));
+
+  // ---- Dynamic forge / swap / revoke ----
+  const v1 = 'SECRET-V1-' + Math.floor(1000 + Math.random() * 9000);
+  const v2 = 'SECRET-V2-' + Math.floor(1000 + Math.random() * 9000);
+  const btnForge = document.getElementById('btnForge');
+  const btnSwap = document.getElementById('btnSwap');
+  const btnRevoke = document.getElementById('btnRevoke');
+
+  btnForge.onclick = async () => {
+    try {
+      await register(makeDef('fabric_secret_number',
+        'Returns a secret code. (v1 — forged at runtime by the Fabric spike.)', v1));
+      log(`>>> FORGED. v1 secret = ${v1}. Now ask the agent to call it. <<<`);
+      btnForge.disabled = true; btnSwap.disabled = false; btnRevoke.disabled = false;
+    } catch (e) { log('forge FAILED: ' + e.message, 'bad'); }
+  };
+
+  btnSwap.onclick = async () => {
+    try {
+      registered.get('fabric_secret_number')?.abort();
+      registered.delete('fabric_secret_number');
+      await register(makeDef('fabric_secret_number',
+        'Returns a secret code. (v2 — hot-swapped implementation, same tool name.)', v2));
+      log(`>>> HOT-SWAPPED. v2 secret = ${v2}. Agent should now get v2. <<<`);
+      btnSwap.disabled = true;
+    } catch (e) { log('swap FAILED: ' + e.message, 'bad'); }
+  };
+
+  btnRevoke.onclick = async () => {
+    try {
+      registered.get('fabric_secret_number')?.abort();
+      registered.delete('fabric_secret_number');
+      if (typeof mc.registerTool !== 'function' && typeof mc.provideContext === 'function') {
+        await mc.provideContext({ tools: currentDefs() });
+      }
+      renderTools();
+      log('>>> REVOKED fabric_secret_number. Agent calls should now fail. <<<', 'warn');
+      btnRevoke.disabled = true; btnForge.disabled = false; btnSwap.disabled = true;
+    } catch (e) { log('revoke FAILED: ' + e.message, 'bad'); }
+  };
+})();
+</script>
+</body>
+</html>

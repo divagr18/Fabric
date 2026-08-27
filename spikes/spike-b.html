@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fabric Spike B — Phone Capability Probe</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0d1117; color:#e6edf3; font:15px/1.5 ui-monospace,Consolas,monospace; padding:20px; max-width:640px; margin-inline:auto; }
+  h1 { font-size:17px; }
+  table { border-collapse:collapse; width:100%; }
+  td { border-bottom:1px solid #21262d; padding:8px 6px; vertical-align:top; }
+  .ok { color:#3fb950; font-weight:700; } .bad { color:#f85149; font-weight:700; } .warn { color:#d29922; font-weight:700; }
+  button { background:#21262d; color:#e6edf3; border:1px solid #30363d; border-radius:6px; padding:12px 16px; font:inherit; cursor:pointer; width:100%; margin:6px 0; }
+  video { width:100%; border-radius:6px; margin-top:8px; display:none; }
+  #summary { font-size:22px; margin:12px 0; }
+  small { color:#7d8590; }
+</style>
+</head>
+<body>
+<h1>Fabric — Spike B: device capability probe</h1>
+<div id="summary">running…</div>
+<table id="results"></table>
+
+<h3>Permission-gated tests (tap each)</h3>
+<button id="btnCam">Test camera (getUserMedia)</button>
+<video id="cam" playsinline autoplay muted></video>
+<button id="btnFiles">Test multi-photo picker</button>
+<input id="filepick" type="file" accept="image/*" multiple style="display:none">
+<button id="btnVibe">Test vibration (the human-dispatch buzz)</button>
+
+<script>
+(async () => {
+  const rows = [];
+  const table = document.getElementById('results');
+  function row(name, status, detail) {
+    rows.push({ name, status });
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${name}</td><td class="${status}">${status.toUpperCase()}</td><td><small>${detail || ''}</small></td>`;
+    table.appendChild(tr);
+    const okCount = rows.filter(r => r.status === 'ok').length;
+    document.getElementById('summary').textContent = `${okCount}/${rows.length} capabilities available`;
+  }
+
+  row('secure context', window.isSecureContext ? 'ok' : 'bad',
+      window.isSecureContext ? location.origin : 'needs HTTPS — camera/WebRTC will fail');
+  row('platform', 'ok', navigator.userAgent.slice(0, 90));
+
+  // WebRTC loopback: two peer connections + datachannel in-page
+  try {
+    const a = new RTCPeerConnection(), b = new RTCPeerConnection();
+    const dc = a.createDataChannel('probe');
+    const opened = new Promise((res, rej) => {
+      const t = setTimeout(() => rej(new Error('timeout 5s')), 5000);
+      b.ondatachannel = e => e.channel.onopen = () => { clearTimeout(t); res(); };
+    });
+    a.onicecandidate = e => e.candidate && b.addIceCandidate(e.candidate);
+    b.onicecandidate = e => e.candidate && a.addIceCandidate(e.candidate);
+    await a.setLocalDescription(await a.createOffer());
+    await b.setRemoteDescription(a.localDescription);
+    await b.setLocalDescription(await b.createAnswer());
+    await a.setRemoteDescription(b.localDescription);
+    await opened;
+    row('WebRTC DataChannel (loopback)', 'ok', 'API works; cross-network NAT still needs live test in Phase 1');
+    a.close(); b.close();
+  } catch (e) { row('WebRTC DataChannel (loopback)', 'bad', e.message); }
+
+  // WebGPU
+  try {
+    if (!navigator.gpu) row('WebGPU', 'warn', 'absent — WASM fallback path');
+    else {
+      const ad = await navigator.gpu.requestAdapter();
+      row('WebGPU', ad ? 'ok' : 'warn', ad ? 'adapter acquired' : 'no adapter — WASM fallback');
+    }
+  } catch (e) { row('WebGPU', 'warn', e.message); }
+
+  row('WebAssembly', typeof WebAssembly === 'object' ? 'ok' : 'bad', '');
+  row('Web Workers', typeof Worker === 'function' ? 'ok' : 'bad', '');
+  row('showDirectoryPicker', 'showDirectoryPicker' in window ? 'ok' : 'warn',
+      'showDirectoryPicker' in window ? 'full folder grants possible (desktop)' : 'expected absent on mobile — file picker instead');
+  row('getUserMedia API', navigator.mediaDevices?.getUserMedia ? 'ok' : 'bad', 'tap camera button for live test');
+  row('vibration API', 'vibrate' in navigator ? 'ok' : 'warn', 'iOS: absent — use sound + visual for dispatch buzz');
+  row('modelContext (WebMCP)', (document.modelContext || navigator.modelContext) ? 'ok' : 'warn',
+      'not needed on node devices — host page only');
+
+  document.getElementById('btnCam').onclick = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const v = document.getElementById('cam');
+      v.srcObject = stream; v.style.display = 'block';
+      row('camera live capture', 'ok', stream.getVideoTracks()[0]?.label || 'stream acquired');
+      setTimeout(() => { stream.getTracks().forEach(t => t.stop()); v.style.display = 'none'; }, 5000);
+    } catch (e) { row('camera live capture', 'bad', e.name + ': ' + e.message); }
+  };
+
+  const picker = document.getElementById('filepick');
+  document.getElementById('btnFiles').onclick = () => picker.click();
+  picker.onchange = () => row('multi-photo pick', picker.files.length ? 'ok' : 'warn',
+      `${picker.files.length} file(s) selected — ${[...picker.files].slice(0,3).map(f => f.name).join(', ')}`);
+
+  document.getElementById('btnVibe').onclick = () => {
+    const did = navigator.vibrate?.([200, 100, 200]);
+    row('vibration fired', did ? 'ok' : 'warn', did ? 'buzzed' : 'not supported (iOS) — sound fallback');
+  };
+})();
+</script>
+</body>
+</html>
