@@ -15,6 +15,16 @@ import {
 
 const MODEL = 'Xenova/clip-vit-base-patch32';
 hfEnv.allowLocalModels = false;
+// Model files come through our own origin (worker proxies hf.co) — no third-party CORS.
+hfEnv.remoteHost = new URL('/api/hf/', self.location.origin).href;
+
+// Diagnostic: record the last URL fetch attempted so failures name their target.
+let lastFetchUrl = '';
+const realFetch = self.fetch.bind(self);
+self.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  lastFetchUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  return realFetch(input, init);
+}) as typeof fetch;
 
 type Backend = 'webgpu' | 'wasm';
 
@@ -102,6 +112,8 @@ self.onmessage = async (ev: MessageEvent) => {
       throw new Error(`unknown op ${op}`);
     }
   } catch (err) {
-    post({ type: 'error', id, error: err instanceof Error ? err.message : String(err) });
+    const base = err instanceof Error ? err.message : String(err);
+    const detail = /fetch/i.test(base) && lastFetchUrl ? `${base} (url: ${lastFetchUrl})` : base;
+    post({ type: 'error', id, error: detail });
   }
 };
