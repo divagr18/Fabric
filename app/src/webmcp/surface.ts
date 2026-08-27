@@ -1,11 +1,11 @@
 import { Hub } from '../transport/hub';
-import { Executor, ExecutionEvents } from '../forge/executor';
-import { Pipeline } from '../forge/pipeline';
-import { validatePipeline } from '../forge/validate';
+import { Executor, ExecutionEvents } from '../compile/executor';
+import { Pipeline } from '../compile/pipeline';
+import { validatePipeline } from '../compile/validate';
 import { WebMcpRegistry } from './registry';
 
 /**
- * The agent-facing surface: four core tools, plus whatever the agent forges.
+ * The agent-facing surface: four core tools, plus whatever the agent compiles.
  * This file is what a judge should read to see how Fabric leverages WebMCP.
  */
 
@@ -34,22 +34,22 @@ export function installCoreSurface(
   const log = (l: string) => events.onLog?.(l);
   const executor = new Executor(hub, events);
 
-  const registerForged = async (pipeline: Pipeline) => {
+  const registerCompiled = async (pipeline: Pipeline) => {
     await registry.register(
       {
         name: pipeline.toolName,
-        description: `${pipeline.description} (forged by the agent at runtime; executes across ${new Set(pipeline.stages.map((s) => s.node)).size} device(s) in this fabric)`,
+        description: `${pipeline.description} (compiled by the agent at runtime; executes across ${new Set(pipeline.stages.map((s) => s.node)).size} device(s) in this fabric)`,
         inputSchema: pipeline.inputSchema,
         execute: (args) => executor.run(pipeline, args),
       },
-      'forged',
+      'compiled',
       pipeline,
     );
   };
 
   void registry.register({
     name: 'inspect_fabric',
-    description: 'See what this fabric currently offers: every connected device (node), the capabilities its owner has explicitly shared (data, compute, human), and the tools already forged. Call this before forging.',
+    description: 'See what this fabric currently offers: every connected device (node), the capabilities its owner has explicitly shared (data, compute, human), and the tools already compiled. Call this before compiling.',
     inputSchema: { type: 'object', properties: {} },
     execute: async () => {
       const graph = hub.getGraph();
@@ -61,16 +61,16 @@ export function installCoreSurface(
           online: n.online,
           capabilities: n.caps.map((c) => ({ id: c.id, kind: c.kind, name: c.name, detail: c.detail, methods: c.methods })),
         })),
-        forged_tools: registry.list().filter((t) => t.origin === 'forged').map((t) => ({
+        compiled_tools: registry.list().filter((t) => t.origin === 'compiled').map((t) => ({
           name: t.def.name, version: t.version, stages: t.pipeline?.stages.length,
         })),
-        note: 'Nodes contribute only what their user explicitly shared. Forge new tools with forge_tool; raw data never leaves the device network.',
+        note: 'Nodes contribute only what their user explicitly shared. Compile new tools with compile_tool; raw data never leaves the device network.',
       };
     },
   }, 'core');
 
   void registry.register({
-    name: 'forge_tool',
+    name: 'compile_tool',
     description: 'Create a new tool that does not exist yet. Describe the goal; Fabric plans a pipeline across the connected devices\' shared capabilities, validates it, and registers the new tool on this page mid-session. Check your tool list afterwards — the tool will be there and you can call it immediately.',
     inputSchema: {
       type: 'object',
@@ -86,7 +86,7 @@ export function installCoreSurface(
       if (graph.nodes.filter((n) => n.online).length === 0) {
         throw new Error('no nodes are connected — ask the user to join a device first');
       }
-      log(`forging: "${goal.slice(0, 80)}"…`);
+      log(`compiling: "${goal.slice(0, 80)}"…`);
       const base = { goal, constraints: args.constraints, graph, existingTools: registry.names() };
 
       let pipeline = await planOnce(base);
@@ -97,10 +97,10 @@ export function installCoreSurface(
         verdict = validatePipeline(pipeline, graph, registry.names());
       }
       if (!verdict.ok) {
-        throw new Error(`could not forge a valid pipeline: ${verdict.errors.join('; ')}`);
+        throw new Error(`could not compile a valid pipeline: ${verdict.errors.join('; ')}`);
       }
 
-      await registerForged(pipeline);
+      await registerCompiled(pipeline);
       log(`⚡ ${pipeline.toolName} REGISTERED (${pipeline.stages.length} stages)`);
       return {
         registered: pipeline.toolName,
@@ -114,7 +114,7 @@ export function installCoreSurface(
 
   void registry.register({
     name: 'revoke_tool',
-    description: 'Remove a previously forged tool from this fabric.',
+    description: 'Remove a previously compiled tool from this fabric.',
     inputSchema: {
       type: 'object',
       properties: { tool_name: { type: 'string' } },
@@ -123,7 +123,7 @@ export function installCoreSurface(
     execute: async (args) => {
       const name = String(args.tool_name ?? '');
       const tool = registry.get(name);
-      if (!tool || tool.origin !== 'forged') throw new Error(`"${name}" is not a forged tool`);
+      if (!tool || tool.origin !== 'compiled') throw new Error(`"${name}" is not a compiled tool`);
       registry.revoke(name);
       log(`revoked ${name}`);
       return { revoked: name };

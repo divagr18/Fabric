@@ -61,6 +61,9 @@ export function NodePage({ roomCode }: { roomCode: string }) {
     store.onChange(() => {
       agent.advertise();
       bump((n) => n + 1);
+      // Pre-warm the embedding model at consent time, not mid-agent-call —
+      // the download happens while the user is still setting up.
+      void embedder.warmup().catch(() => { /* surfaced via status */ });
     });
     embedder.onStatus = (s) => {
       setEmbedStatus(s);
@@ -123,9 +126,9 @@ export function NodePage({ roomCode }: { roomCode: string }) {
         </div>
         <p className="dim" style={{ marginBottom: 0 }}>
           embed model: {embedStatus.state === 'ready' ? `ready (${embedStatus.backend})`
-            : embedStatus.state === 'loading' ? `loading ${embedStatus.pct ?? 0}%`
+            : embedStatus.state === 'loading' ? `downloading ${embedStatus.pct ?? 0}%${embedStatus.mbTotal ? ` (${embedStatus.mb}/${embedStatus.mbTotal} MB)` : ''}`
             : embedStatus.state === 'error' ? `error — ${embedStatus.error}`
-            : 'loads on first use'}
+            : 'downloads when you share files'}
         </p>
       </div>
 

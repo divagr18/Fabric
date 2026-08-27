@@ -41,7 +41,7 @@ export function HostPage() {
     hub.on('status', setStatus);
     hub.start();
     registry.on((e) => {
-      if (e.type === 'registered' && e.origin === 'forged') addLine(`⚡ + ${e.name} REGISTERED via WebMCP`);
+      if (e.type === 'registered' && e.origin === 'compiled') addLine(`⚡ + ${e.name} REGISTERED via WebMCP`);
       else if (e.type === 'swapped') addLine(`🔥 ${e.name} hot-swapped → v${e.version}`);
       else if (e.type === 'revoked') addLine(`− ${e.name} revoked`);
     });

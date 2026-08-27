@@ -1,6 +1,6 @@
 /** Run: npx tsx tests/plan.smoke.ts — POSTs a canned graph to /api/plan and validates the result. */
-import { validatePipeline } from '../app/src/forge/validate';
-import type { Pipeline } from '../app/src/forge/pipeline';
+import { validatePipeline } from '../app/src/compile/validate';
+import type { Pipeline } from '../app/src/compile/pipeline';
 import type { CapabilityGraph } from '../app/src/transport/hub';
 
 const BASE = process.env.BASE ?? 'https://fabric.keshav-agr2007.workers.dev';

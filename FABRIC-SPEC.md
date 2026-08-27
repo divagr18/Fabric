@@ -6,7 +6,7 @@
 
 ## 0. The one-paragraph version
 
-Fabric is a web app that turns every browser you own — laptop, desktop, phone — into one runtime an agent can use. Devices join a session with one QR scan, each contributing only what its owner explicitly exposes: files, GPU compute, camera, judgment. ChatGPT sees a tiny WebMCP tool surface (`inspect_fabric`, `forge_tool`, `revoke_tool`) and **forges the tools it needs at runtime** — Fabric plans a cross-device pipeline, registers the new tool via WebMCP mid-session, and ChatGPT calls it seconds later. When the hardware changes — a device dies, or the human revokes a capability mid-task — Fabric replans and hot-reloads the tool's implementation while its WebMCP interface survives. The human is a node in the runtime, not a spectator: the agent schedules people (photograph this, decide that, approve this) exactly like it schedules GPUs.
+Fabric is a web app that turns every browser you own — laptop, desktop, phone — into one runtime an agent can use. Devices join a session with one QR scan, each contributing only what its owner explicitly exposes: files, GPU compute, camera, judgment. ChatGPT sees a tiny WebMCP tool surface (`inspect_fabric`, `compile_tool`, `revoke_tool`) and **compiles the tools it needs at runtime** — Fabric plans a cross-device pipeline, registers the new tool via WebMCP mid-session, and ChatGPT calls it seconds later. When the hardware changes — a device dies, or the human revokes a capability mid-task — Fabric replans and hot-reloads the tool's implementation while its WebMCP interface survives. The human is a node in the runtime, not a spectator: the agent schedules people (photograph this, decide that, approve this) exactly like it schedules GPUs.
 
 ---
 
@@ -84,7 +84,7 @@ Chosen because identity documents are the most sensitive files a person owns —
 **The loop as demoed:**
 
 1. Nodes join → consent cards on camera → ChatGPT sees 3 core tools.
-2. ChatGPT calls `forge_tool` → planning graph renders → `assemble_document_packet` **appears in ChatGPT's tool list**. ("That tool didn't exist four seconds ago.")
+2. ChatGPT calls `compile_tool` → planning graph renders → `assemble_document_packet` **appears in ChatGPT's tool list**. ("That tool didn't exist four seconds ago.")
 3. ChatGPT calls it → checklist auto-fills item by item, doc thumbnails stream in, per-node throughput counters, `0 B uploaded`.
 4. Pipeline blocks on a physical-only document → **phone buzzes with a capture request** → you photograph the paper → pipeline flows.
 5. **You revoke the desktop's archive access mid-run** (or close its lid) → `MUSCLE LOST → replanning → OCR falls back to laptop/WASM → HOT RELOAD COMPLETE` → same WebMCP tool, called again, completes — visibly slower. Honest.
@@ -100,8 +100,8 @@ Chosen because identity documents are the most sensitive files a person owns —
                   WebMCP  (navigator.modelContext — register/unregister at runtime)
                      │
         ┌──────── Fabric Host page ────────┐
-        │  Tool Registry (core + forged)   │
-        │  Forge / Planner (LLM → pipeline │
+        │  Tool Registry (core + compiled)   │
+        │  Compile / Planner (LLM → pipeline │
         │    JSON over typed primitives —  │
         │    NO arbitrary codegen)         │
         │  Executor + Hot-Reload Manager   │
@@ -121,7 +121,7 @@ Chosen because identity documents are the most sensitive files a person owns —
 - `human.request(kind, payload)` — capture / decide / approve
 - `artifact.compile(parts)` — pdf-lib on the host
 
-**forge_tool contract:** input = goal + constraints → LLM planner (server-side API call, small model, few-second budget) emits a pipeline JSON referencing only primitives available in the current capability graph → validated → registered via WebMCP with schema. Rejected plans surface as honest errors. Hot reload = re-run the planner against the updated graph, same tool name + schema, version bump visible in UI.
+**compile_tool contract:** input = goal + constraints → LLM planner (server-side API call, small model, few-second budget) emits a pipeline JSON referencing only primitives available in the current capability graph → validated → registered via WebMCP with schema. Rejected plans surface as honest errors. Hot reload = re-run the planner against the updated graph, same tool name + schema, version bump visible in UI.
 
 **Honesty constraints (Chrome engineers are judging — one overclaim torches everything):**
 
@@ -136,8 +136,8 @@ Chosen because identity documents are the most sensitive files a person owns —
 
 Live-runtime feel, not SaaS dashboard. (Precedent: Work From Coffee OS won Vercel's own hackathon on craft; Observee won the YC MCP hackathon on making tool calls visible. The observability surface is the proof layer — the product is the task completing.)
 
-- **Left:** nodes + consent state. **Center:** live execution topology — stages light up on the node running them, including the human stage. **Right:** the live WebMCP surface — CORE tools / FORGED tools with version badges (`v2 · hot-reloaded`).
-- Permanent metrics strip: `nodes · forged tools · hot reloads · raw data uploaded: 0 B`.
+- **Left:** nodes + consent state. **Center:** live execution topology — stages light up on the node running them, including the human stage. **Right:** the live WebMCP surface — CORE tools / COMPILED tools with version badges (`v2 · hot-reloaded`).
+- Permanent metrics strip: `nodes · compiled tools · hot reloads · raw data uploaded: 0 B`.
 - Polish bar is high; jank is punished harder than narrowness by this panel. Every state transition tight. `tabular-nums` on all counters.
 
 ---
@@ -149,14 +149,14 @@ A judge alone on one laptop during Sep 4–21 must experience the full loop in u
 1. **Tabs are nodes** — real nodes, zero extra architecture. Landing page says: "Open these two links in new tabs/windows — each becomes a device."
 2. **Hosted always-on node** — a headless browser joined to the demo room (real node, not simulated), pre-loaded with sample documents, so the fabric is never empty.
 3. **Phone join via QR** works for judges who bother — but is never required.
-4. Sample dataset baked in (fake-but-realistic visa docs) so forge → execute → revoke → hot reload works with zero setup.
+4. Sample dataset baked in (fake-but-realistic visa docs) so compile → execute → revoke → hot reload works with zero setup.
 5. No separate "simulated node" code path — second code paths that exist only to fake the demo read as mocked.
 
 ---
 
 ## 8. Day-1 spikes (before ANY other code)
 
-1. **THE load-bearing wall:** a 20-line page registering a WebMCP tool on button-click while ChatGPT is connected. Does ChatGPT see mid-session registrations? Test in ChatGPT's browser AND Chrome-with-WebMCP. If tool-list changes aren't picked up live → fallbacks, in order: (a) a core tool response that instructs/triggers list refresh, (b) prompt nudge ("check your tools"), (c) restructure the demo so forging happens between agent turns. Everything else in this document depends on the answer.
+1. **THE load-bearing wall:** a 20-line page registering a WebMCP tool on button-click while ChatGPT is connected. Does ChatGPT see mid-session registrations? Test in ChatGPT's browser AND Chrome-with-WebMCP. If tool-list changes aren't picked up live → fallbacks, in order: (a) a core tool response that instructs/triggers list refresh, (b) prompt nudge ("check your tools"), (c) restructure the demo so compiling happens between agent turns. Everything else in this document depends on the answer.
 2. **Phone reality check:** Android Chrome + iOS Safari — WebRTC data channels, `<input type=file multiple>`, getUserMedia, QR-join flow.
 3. **Stretch (timeboxed to 2h):** Chrome's built-in agent driving the same fabric page → the cross-vendor beat ("ChatGPT and Gemini cooperated through an open standard"). If flaky, cut without mourning; note it in README as roadmap.
 
@@ -166,13 +166,13 @@ A judge alone on one laptop during Sep 4–21 must experience the full loop in u
 
 **MVP (all of this, nothing more):**
 - 3 nodes (any mix of machines/tabs) + hosted node
-- 4 core WebMCP tools: `inspect_fabric`, `forge_tool`, `revoke_tool`, `request_from_human`
-- One forged cross-device tool (the Packet pipeline), real planner, real local compute
+- 4 core WebMCP tools: `inspect_fabric`, `compile_tool`, `revoke_tool`, `request_from_human`
+- One compiled cross-device tool (the Packet pipeline), real planner, real local compute
 - One human-dispatch beat, one revocation, one hot reload
 - Live-runtime UI + metrics
 - Judge-alone path + sample data
 
-**CUT (decided — do not creep):** JIT/trace compilation · session/auth capabilities · deploy permissions · capability SDK · OPFS · 7-package monorepo · arbitrary codegen · Wasm DSL compiler (the honest one-liner survives: forged plans execute in workers over typed primitives, not eval'd code) · multi-human rooms · TV nodes · Kubernetes-anything.
+**CUT (decided — do not creep):** JIT/trace compilation · session/auth capabilities · deploy permissions · capability SDK · OPFS · 7-package monorepo · arbitrary codegen · Wasm DSL compiler (the honest one-liner survives: compiled plans execute in workers over typed primitives, not eval'd code) · multi-human rooms · TV nodes · Kubernetes-anything.
 
 ---
 
@@ -183,7 +183,7 @@ A judge alone on one laptop during Sep 4–21 must experience the full loop in u
 | **1 (Aug 26)** | Spikes 1–3. GO/NO-GO on dynamic registration. Repo scaffold, hosting (Cloudflare or Vercel — both are sponsor-judges), signaling worker |
 | **2** | Node join: WebRTC mesh, capability advertisement, consent cards, QR flow, tabs-as-nodes |
 | **3** | Primitives on nodes: directory/file grants, embed/OCR workers (WebGPU + WASM), `human.request` cards |
-| **4** | Forge: planner → pipeline JSON → validation → WebMCP registration. First end-to-end forged call |
+| **4** | Compile: planner → pipeline JSON → validation → WebMCP registration. First end-to-end compiled call |
 | **5** | Hot reload: revocation + node-loss → replan → re-register. Full loop works. **Feature freeze.** |
 | **6** | UI polish day: topology animation, counters, tool-surface panel, packet result view. Hosted node + sample data + judge path |
 | **7** | Video: storyboard, record real footage (all takes), edit. README + annotated transcript |
@@ -197,14 +197,14 @@ Rule: anything not in the video or the judge-alone path doesn't get built.
 
 Calibration test for every shot: *a Chrome engineer thinks "that's technically outrageous"; their non-technical partner glancing over thinks "oh, it's doing their visa paperwork without uploading their passport."*
 
-- **0:00–0:20 — Cold open on the trick.** ChatGPT on screen, tool list: 3 tools. Cut: three devices on a real desk, nodes joining. Cut back: `forge_tool` runs — a 4th tool appears in ChatGPT's list. VO: "That tool didn't exist four seconds ago. ChatGPT just built it — out of my three computers."
+- **0:00–0:20 — Cold open on the trick.** ChatGPT on screen, tool list: 3 tools. Cut: three devices on a real desk, nodes joining. Cut back: `compile_tool` runs — a 4th tool appears in ChatGPT's list. VO: "That tool didn't exist four seconds ago. ChatGPT just built it — out of my three computers."
 - **0:20–0:35 — The constraint, stated like an engineer.** "A visa application needs my passport, bank statements, and photos — scattered across three devices. Every service that could help wants me to upload all of it. No."
 - **0:35–1:00 — Assembly.** Consent cards on camera (real Chrome permission prompts). Node cards: `LAPTOP · documents · 3,182 files` / `DESKTOP · archive + WebGPU` / phone QR-scans in live. VO: "Codex proved agents should work on your machine. Fabric asks why they stop at one."
-- **1:00–1:25 — Forge.** The ask. Planning graph renders. `+ assemble_document_packet — REGISTERED`. ChatGPT immediately calls it.
+- **1:00–1:25 — Compile.** The ask. Planning graph renders. `+ assemble_document_packet — REGISTERED`. ChatGPT immediately calls it.
 - **1:25–1:50 — Execution.** Topology lights up per stage, checklist auto-fills, thumbnails stream, `0 B uploaded` counter huge. Then: pipeline blocks → **phone buzzes** → "Fabric needs: photograph the paper certificate" → shoot it on camera → pipeline flows. VO: "I'm not watching it work. I'm in the runtime — it schedules me like it schedules the GPU."
 - **1:50–2:20 — The twist.** Revoke the desktop's archive access mid-run (tap, on camera). `MUSCLE LOST → replanning → OCR → laptop/WASM → HOT RELOAD v2`. Same tool called again — works, visibly slower. VO: "Same tool. New machine underneath. The agent never lost its footing — and I never lost control."
-- **2:20–2:40 — The artifact.** Approval tap. Compiled packet on screen, scrolled. Metrics strip: `3 devices · 1 forged tool · 1 hot reload · 0 B uploaded`.
-- **2:40–2:50 — Close.** "WebMCP lets a site declare its tools ahead of time. Fabric lets the agent forge them while it works — from the devices you already own. The open web is already installed everywhere. Fabric makes it the place agents work."
+- **2:20–2:40 — The artifact.** Approval tap. Compiled packet on screen, scrolled. Metrics strip: `3 devices · 1 compiled tool · 1 hot reload · 0 B uploaded`.
+- **2:40–2:50 — Close.** "WebMCP lets a site declare its tools ahead of time. Fabric lets the agent compile them while it works — from the devices you already own. The open web is already installed everywhere. Fabric makes it the place agents work."
 
 ---
 
@@ -217,7 +217,7 @@ Calibration test for every shot: *a Chrome engineer thinks "that's technically o
   - *Why WebMCP fits this use case*
   - *What people and agents can do together that they couldn't before*
   - *How we implemented WebMCP* — *file paths + line refs* to registration, schemas, dynamic re-registration
-- **README extras:** `webmcp/` directory impossible to miss · **annotated session transcript** of the full loop (forge → register → call → human dispatch → revoke → hot reload → call again) — the artifact that lets a text-only evaluator verify the central claim · concrete numbers, zero unfalsifiable poetry · screenshots
+- **README extras:** `webmcp/` directory impossible to miss · **annotated session transcript** of the full loop (compile → register → call → human dispatch → revoke → hot reload → call again) — the artifact that lets a text-only evaluator verify the central claim · concrete numbers, zero unfalsifiable poetry · screenshots
 
 ---
 
@@ -225,12 +225,12 @@ Calibration test for every shot: *a Chrome engineer thinks "that's technically o
 
 | Criterion (equal weight) | Evidence on screen |
 |---|---|
-| **WebMCP Leverage** | Tool surface born, mutated, hot-swapped mid-session inside ChatGPT; tiny core surface; forged tools with schemas; humans in the tool list; registration code greppable in 10 seconds |
+| **WebMCP Leverage** | Tool surface born, mutated, hot-swapped mid-session inside ChatGPT; tiny core surface; compiled tools with schemas; humans in the tool list; registration code greppable in 10 seconds |
 | **Execution** | Complete product arc: chore → assembled packet. Judge-alone path works cold. Polish everywhere. Not a PoC — a task actually finishes |
-| **Potential Impact** | Specific, credible, demonstrated: sensitive-document chores without uploading identity docs; generalizes via forge. `0 B` is proof, not promise |
+| **Potential Impact** | Specific, credible, demonstrated: sensitive-document chores without uploading identity docs; generalizes via compile. `0 B` is proof, not promise |
 | **Creativity & Ambition** | Tools that don't pre-exist; execution topology that doesn't stay fixed; a semantic tool surviving physical change; a person as a scheduled capability. Nobody else will have any of these |
 
-**Panel notes:** Nahas → the syscall/membrane reveal + real dynamic registration. Chrome (Drasner) → consent surfaces used honestly + revocation-as-steering. OpenAI (Rushing) → ChatGPT-first demo, forge moment. Cloudflare/Vercel/Netlify → hosted on them, open-web thesis. Shopify (Grigorik) → performance honesty (WASM fallback shown slower, not hidden).
+**Panel notes:** Nahas → the syscall/membrane reveal + real dynamic registration. Chrome (Drasner) → consent surfaces used honestly + revocation-as-steering. OpenAI (Rushing) → ChatGPT-first demo, compile moment. Cloudflare/Vercel/Netlify → hosted on them, open-web thesis. Shopify (Grigorik) → performance honesty (WASM fallback shown slower, not hidden).
 
 ---
 
@@ -253,7 +253,7 @@ Calibration test for every shot: *a Chrome engineer thinks "that's technically o
 
 | Risk | Fallback |
 |---|---|
-| ChatGPT doesn't see mid-session registrations | Spike 1 fallbacks (§8); worst case: forge between turns — loop survives, money shot softens |
+| ChatGPT doesn't see mid-session registrations | Spike 1 fallbacks (§8); worst case: compile between turns — loop survives, money shot softens |
 | WebRTC flaky across networks | Relay through signaling worker; tabs-as-nodes always works |
 | WebGPU unavailable/slow | WASM everywhere; keep honest labels; slower-but-works is on-message |
 | Planner emits bad pipelines | Tight validation + honest error surfaced to agent; retry once; demo path uses a well-tested goal |

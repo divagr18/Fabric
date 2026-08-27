@@ -25,7 +25,7 @@
 ## Test rig (running now)
 - Local: http://localhost:4173 (`npx serve` on `spikes/`)
 - HTTPS tunnel (phone + ChatGPT): **https://dude-solaris-stages-column.trycloudflare.com** (quick tunnel — URL changes on restart)
-- `spike-a.html` — registers `fabric_ping` (static, unique token) + buttons: FORGE `fabric_secret_number` v1 / HOT-SWAP to v2 (same name) / REVOKE. Logs every real invocation; listens for `toolchange`.
+- `spike-a.html` — registers `fabric_ping` (static, unique token) + buttons: COMPILE `fabric_secret_number` v1 / HOT-SWAP to v2 (same name) / REVOKE. Logs every real invocation; listens for `toolchange`.
 - `spike-b.html` — device probe: WebRTC loopback, WebGPU, WASM, camera, multi-file pick, directory picker, vibration.
 
 ## Test matrix — fill during manual run
@@ -34,7 +34,7 @@
 | # | Test | Result | Notes |
 |---|---|---|---|
 | A1 | `fabric_ping` called, token matches page | ☐ | |
-| A2 | Forged tool visible mid-conversation without any refresh | ☐ | |
+| A2 | Compiled tool visible mid-conversation without any refresh | ☐ | |
 | A3 | …or visible after next user message | ☐ | |
 | A4 | …or only after page/agent refresh | ☐ | |
 | A5 | HOT-SWAP: same name returns v2 secret | ☐ | |
@@ -46,7 +46,7 @@
 |---|---|---|---|
 | C1 | Flag enabled, `document.modelContext` present | ☐ | |
 | C2 | DevTools WebMCP panel shows registered tools | ☐ | |
-| C3 | Panel reflects forge/swap/revoke live | ☐ | |
+| C3 | Panel reflects compile/swap/revoke live | ☐ | |
 | C4 | Any in-Chrome agent (Gemini) can call tools | ☐ | Spike C — 2h timebox |
 
 ### Spike B: phone
@@ -61,8 +61,8 @@
 ## Decision — RECORDED Aug 27, 2026
 
 **Manual test run (user-executed): ALL TESTS PASSED.**
-- ChatGPT in-app browser: `fabric_ping` verified by token; forged tool visible and callable mid-session; hot-swap returned v2 secret under the same tool name; revoke failed cleanly. (A1–A7 ✅)
-- Chrome 151 + `#enable-webmcp-testing` flag: `document.modelContext` present, DevTools WebMCP panel reflects forge/swap/revoke. (C1–C3 ✅)
+- ChatGPT in-app browser: `fabric_ping` verified by token; compiled tool visible and callable mid-session; hot-swap returned v2 secret under the same tool name; revoke failed cleanly. (A1–A7 ✅)
+- Chrome 151 + `#enable-webmcp-testing` flag: `document.modelContext` present, DevTools WebMCP panel reflects compile/swap/revoke. (C1–C3 ✅)
 - Phone: capability probes passed. (B ✅)
 
 - [x] **GO — full spec** (mid-conversation registration works)

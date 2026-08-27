@@ -9,8 +9,10 @@ import {
 } from '@huggingface/transformers';
 
 /**
- * CLIP embedding worker. Tries WebGPU, falls back to WASM — the active backend
- * is reported so the capability descriptor and UI can name it honestly.
+ * CLIP embedding worker. Device/dtype strategy picks the smallest download that
+ * works: mobile prefers wasm+q8 (~88MB); desktop tries webgpu+fp16 first, falls
+ * back to wasm+q8. The active backend is reported so the capability descriptor
+ * and UI can name it honestly.
  */
 
 const MODEL = 'Xenova/clip-vit-base-patch32';
@@ -38,24 +40,50 @@ function post(msg: unknown) {
   (self as unknown as Worker).postMessage(msg);
 }
 
+// Several files download concurrently, each with its own 0-100%. Aggregate by
+// bytes across all files so the reported percentage only ever moves forward.
+const fileProgress = new Map<string, { loaded: number; total: number }>();
+function progress_callback(p: { status?: string; file?: string; loaded?: number; total?: number }) {
+  if (p.status !== 'progress' || !p.file || typeof p.loaded !== 'number' || !p.total) return;
+  fileProgress.set(p.file, { loaded: p.loaded, total: p.total });
+  let loaded = 0, total = 0;
+  for (const f of fileProgress.values()) {
+    loaded += f.loaded;
+    total += f.total;
+  }
+  post({
+    type: 'progress',
+    pct: Math.min(99, Math.round((100 * loaded) / total)),
+    mb: +(loaded / 1048576).toFixed(1),
+    mbTotal: +(total / 1048576).toFixed(1),
+  });
+}
+
+const IS_MOBILE = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+
+function attempts(): Array<{ device: Backend; dtype: 'fp16' | 'q8' }> {
+  const hasGpu = 'gpu' in navigator;
+  if (IS_MOBILE) {
+    // smallest download first — q8 is ~88MB vs fp16 ~170MB vs fp32 ~350MB
+    return [{ device: 'wasm', dtype: 'q8' }, ...(hasGpu ? [{ device: 'webgpu', dtype: 'fp16' } as const] : [])];
+  }
+  return hasGpu
+    ? [{ device: 'webgpu', dtype: 'fp16' }, { device: 'wasm', dtype: 'q8' }]
+    : [{ device: 'wasm', dtype: 'q8' }];
+}
+
 async function loadVision(): Promise<void> {
   if (vision) return;
-  processor = await AutoProcessor.from_pretrained(MODEL, {});
-  const progress_callback = (p: { status?: string; progress?: number; file?: string }) => {
-    if (p.status === 'progress' && typeof p.progress === 'number') {
-      post({ type: 'progress', pct: Math.round(p.progress), file: p.file ?? '' });
-    }
-  };
-  const preferred: Backend[] = 'gpu' in navigator ? ['webgpu', 'wasm'] : ['wasm'];
+  processor = await AutoProcessor.from_pretrained(MODEL, { progress_callback });
   let lastErr: unknown = null;
-  for (const device of preferred) {
+  for (const attempt of attempts()) {
     try {
       vision = await CLIPVisionModelWithProjection.from_pretrained(MODEL, {
-        device,
-        dtype: device === 'webgpu' ? 'fp32' : 'q8',
+        device: attempt.device,
+        dtype: attempt.dtype,
         progress_callback,
       });
-      backend = device;
+      backend = attempt.device;
       return;
     } catch (err) {
       lastErr = err;
@@ -68,7 +96,7 @@ async function loadVision(): Promise<void> {
 async function loadText(): Promise<void> {
   if (text) return;
   tokenizer = await AutoTokenizer.from_pretrained(MODEL);
-  text = await CLIPTextModelWithProjection.from_pretrained(MODEL, { dtype: 'q8' });
+  text = await CLIPTextModelWithProjection.from_pretrained(MODEL, { dtype: 'q8', progress_callback });
 }
 
 async function embedImages(files: File[]): Promise<number[][]> {

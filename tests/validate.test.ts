@@ -1,6 +1,6 @@
 /** Run: npx tsx tests/validate.test.ts */
-import { validatePipeline } from '../app/src/forge/validate';
-import { Pipeline } from '../app/src/forge/pipeline';
+import { validatePipeline } from '../app/src/compile/validate';
+import { Pipeline } from '../app/src/compile/pipeline';
 import type { CapabilityGraph } from '../app/src/transport/hub';
 
 const graph: CapabilityGraph = {

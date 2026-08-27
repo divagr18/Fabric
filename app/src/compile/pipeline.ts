@@ -1,5 +1,5 @@
 /**
- * Forged-tool pipeline model. A pipeline is a DAG of primitive invocations,
+ * Compiled-tool pipeline model. A pipeline is a DAG of primitive invocations,
  * bound to real nodes in the capability graph, produced by the planner LLM
  * and validated before it ever runs. No arbitrary code — only these shapes.
  */

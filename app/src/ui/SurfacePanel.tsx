@@ -11,7 +11,7 @@ export function SurfacePanel({ registry }: { registry: WebMcpRegistry }) {
   }, [registry]);
 
   const core = tools.filter((t) => t.origin === 'core');
-  const forged = tools.filter((t) => t.origin === 'forged');
+  const compiled = tools.filter((t) => t.origin === 'compiled');
 
   return (
     <div className="panel">
@@ -27,9 +27,9 @@ export function SurfacePanel({ registry }: { registry: WebMcpRegistry }) {
       {core.map((t) => (
         <p key={t.def.name} style={{ margin: '2px 0' }}>● <code>{t.def.name}</code></p>
       ))}
-      <p className="dim" style={{ margin: '10px 0 4px' }}>FORGED</p>
-      {forged.length === 0 && <p className="dim" style={{ margin: 0 }}>none yet — the agent forges these at runtime</p>}
-      {forged.map((t) => (
+      <p className="dim" style={{ margin: '10px 0 4px' }}>COMPILED</p>
+      {compiled.length === 0 && <p className="dim" style={{ margin: 0 }}>none yet — the agent compiles these at runtime</p>}
+      {compiled.map((t) => (
         <p key={t.def.name} style={{ margin: '2px 0', display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center' }}>
           <span>⚡ <code>{t.def.name}</code>{' '}
             <span className="badge" title={`${t.pipeline?.stages.length ?? '?'} stages`}>

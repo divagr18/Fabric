@@ -38,7 +38,7 @@ const STALE_MS = 8_000;
 /** Per-method RPC budgets: humans take minutes, models take a while, everything else is quick. */
 function rpcTimeout(method: string): number {
   if (method.startsWith('human.')) return 300_000;
-  if (method.startsWith('compute.')) return 120_000;
+  if (method.startsWith('compute.')) return 240_000; // first call may still include model warm-up on slow devices
   return 10_000;
 }
 

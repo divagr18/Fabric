@@ -28,8 +28,8 @@ The money shot depends on ChatGPT seeing a tool registered mid-session.
 | Result | Consequence |
 |---|---|
 | New tool visible mid-conversation | Full spec as written. GO |
-| Visible only on next user turn | Demo choreography: forge at end of one turn, call on the next. Still strong. GO |
-| Requires reconnect/refresh | Forge flow returns "tool ready — refresh tools" via core-tool response; hot reload keeps same tool name/schema so ONLY registration timing softens. GO with adjusted script |
+| Visible only on next user turn | Demo choreography: compile at end of one turn, call on the next. Still strong. GO |
+| Requires reconnect/refresh | Compile flow returns "tool ready — refresh tools" via core-tool response; hot reload keeps same tool name/schema so ONLY registration timing softens. GO with adjusted script |
 | Never visible dynamically | 🔴 Restructure: pre-register tool *names* with mutable implementations — leverage story shifts to hot-swap-under-stable-schema. Rewrite video §11 before building anything |
 
 ### 0.2 Spike B — Phone reality (~1h)
@@ -39,7 +39,7 @@ The money shot depends on ChatGPT seeing a tool registered mid-session.
 ### 0.3 Spike C — Chrome's agent on the fabric page (STRICT 2h timebox)
 - [ ] Can Chrome's built-in agent call the same page's WebMCP tools? If yes → cross-vendor beat lives. If flaky → cut, one README roadmap line, zero mourning.
 
-**Exit gate 0:** GO/NO-GO recorded; demo choreography for the forge moment decided; phone combo picked.
+**Exit gate 0:** GO/NO-GO recorded; demo choreography for the compile moment decided; phone combo picked.
 
 ---
 
@@ -56,7 +56,7 @@ Goal: N browsers form a room and exchange typed messages.
   │   ├── webmcp/        # ALL WebMCP surface code — greppable in 10s (registry, schemas, register/unregister)
   │   ├── transport/     # signaling client, WebRTC mesh, protocol types
   │   ├── capabilities/  # primitives + consent
-  │   ├── forge/         # planner client, pipeline validator, executor, hot-reload
+  │   ├── compile/         # planner client, pipeline validator, executor, hot-reload
   │   ├── ui/            # panels, topology, cards, counters
   │   └── node/          # node-page entry (a device's view)
   ├── worker/            # Cloudflare Worker: signaling (Durable Object) + planner proxy
@@ -108,12 +108,12 @@ Goal: real primitives, real consent, running on real nodes.
 
 ---
 
-## Phase 3 — WebMCP surface + Forge (Day 4)
+## Phase 3 — WebMCP surface + Compile (Day 4)
 
-Goal: ChatGPT forges a tool and calls it, end to end. **The project's spine day.**
+Goal: ChatGPT compiles a tool and calls it, end to end. **The project's spine day.**
 
 ### 3.1 Core WebMCP tools (~2h)
-- [ ] Register `inspect_fabric`, `forge_tool`, `revoke_tool`, `request_from_human` with clean JSON schemas + descriptions written for an agent reader
+- [ ] Register `inspect_fabric`, `compile_tool`, `revoke_tool`, `request_from_human` with clean JSON schemas + descriptions written for an agent reader
 - [ ] `inspect_fabric` returns the capability graph in agent-friendly form (semantic, not raw devices)
 
 ### 3.2 Planner (~4h)
@@ -124,10 +124,10 @@ Goal: ChatGPT forges a tool and calls it, end to end. **The project's spine day.
 
 ### 3.3 Executor + registration (~4h)
 - [ ] DAG runner: dispatch stages over RPC, stream stage events (for UI), collect results, propagate failures
-- [ ] On successful plan: register forged tool via WebMCP (name, description, input/output schema from planner), store plan as `v1`
+- [ ] On successful plan: register compiled tool via WebMCP (name, description, input/output schema from planner), store plan as `v1`
 - [ ] Wire the Phase-0 choreography decision (mid-turn vs next-turn registration)
 
-**Exit gate 3:** In ChatGPT against the live URL: `forge_tool` → `assemble_document_packet` appears → ChatGPT calls it → multi-node execution completes → structured results (checklist status + doc refs) return to ChatGPT. **Record a screen capture the moment this works** — raw footage bank + proof-of-progress.
+**Exit gate 3:** In ChatGPT against the live URL: `compile_tool` → `assemble_document_packet` appears → ChatGPT calls it → multi-node execution completes → structured results (checklist status + doc refs) return to ChatGPT. **Record a screen capture the moment this works** — raw footage bank + proof-of-progress.
 **Contingency:** LLM planning unreliable → planner becomes template-retrieval (curated plan for the packet-shaped goal, parameterized by graph). Keep the LLM path behind a flag; README describes exactly what's dynamic. Honesty > theater.
 
 ---
@@ -141,7 +141,7 @@ Goal: ChatGPT forges a tool and calls it, end to end. **The project's spine day.
 
 ### 4.2 Hot reload (~5h)
 - [ ] Triggers: `node_lost` (heartbeat timeout) AND live revocation (a node un-toggles a capability mid-run)
-- [ ] On trigger: mark affected forged tools stale → replan against updated graph → same name+schema, plan `v2` → version badge in UI → in-flight execution either resumes from completed stages (nice) or restarts cleanly (acceptable)
+- [ ] On trigger: mark affected compiled tools stale → replan against updated graph → same name+schema, plan `v2` → version badge in UI → in-flight execution either resumes from completed stages (nice) or restarts cleanly (acceptable)
 - [ ] Agent-facing: tool result includes a note when execution ran on a degraded/replanned fabric ("GPU unavailable — completed on WASM, 4.2× slower") — honesty as a feature
 - [ ] Rehearse both demo variants: lid-close (node loss) and revoke-toggle (steering)
 
@@ -156,8 +156,8 @@ Goal: ChatGPT forges a tool and calls it, end to end. **The project's spine day.
 ## Phase 5 — Product polish + judge-alone path (Day 6)
 
 ### 5.1 The three-panel runtime UI (~5h)
-- [ ] Left: nodes + consent state. Center: live topology — stages light on the node running them, human stage included. Right: WebMCP surface — CORE / FORGED, version badges, birth animation on registration
-- [ ] Metrics strip: `nodes · forged tools · hot reloads · raw data uploaded: 0 B` (`tabular-nums`)
+- [ ] Left: nodes + consent state. Center: live topology — stages light on the node running them, human stage included. Right: WebMCP surface — CORE / COMPILED, version badges, birth animation on registration
+- [ ] Metrics strip: `nodes · compiled tools · hot reloads · raw data uploaded: 0 B` (`tabular-nums`)
 - [ ] Result view: checklist filling, doc thumbnails, compiled packet preview — this is the artifact shot, art-direct it
 - [ ] Pass: every animation maps to a real system event; kill anything decorative
 
@@ -174,7 +174,7 @@ Goal: ChatGPT forges a tool and calls it, end to end. **The project's spine day.
 ## Phase 6 — Video (Day 7, full day, protected)
 
 - [ ] Morning: storyboard §11 shot-for-shot; stage the desk (3 devices visible, clean); phone camera on tripod/stack for the physical shots
-- [ ] Record in segments, many takes: cold-open tool-list mutation · consent cards · QR join · forge+registration · execution+phone buzz+paper capture · revocation+hot reload · artifact · close
+- [ ] Record in segments, many takes: cold-open tool-list mutation · consent cards · QR join · compile+registration · execution+phone buzz+paper capture · revocation+hot reload · artifact · close
 - [ ] Screen recordings at 1080p+, UI at comfortable zoom; physical shots on phone
 - [ ] Voiceover: yourself, script from §11, slightly imperfect > polished-agency (evidence: every winner studied)
 - [ ] Edit to ≤2:55. No copyrighted music (rules), captions for key lines
@@ -184,7 +184,7 @@ Goal: ChatGPT forges a tool and calls it, end to end. **The project's spine day.
 
 ## Phase 7 — Packaging + submission (Day 8, Sep 2 → Sep 3 morning)
 
-- [ ] README: hero GIF · **WebMCP implementation section with file paths + line refs** · architecture sketch · **annotated session transcript** (forge → register → call → human dispatch → revoke → hot reload → call again) · benchmark numbers · spike findings · run instructions
+- [ ] README: hero GIF · **WebMCP implementation section with file paths + line refs** · architecture sketch · **annotated session transcript** (compile → register → call → human dispatch → revoke → hot reload → call again) · benchmark numbers · spike findings · run instructions
 - [ ] Devpost description with rubric-mirroring headings: *Why WebMCP fits* / *What people and agents do together that they couldn't* / *Implementation* — concrete numbers, zero unfalsifiable poetry
 - [ ] License visible in repo header; repo cleaned (no dead packages, no TODO graveyards)
 - [ ] Smoke test live URL from a clean machine + phone network (not home Wi-Fi)

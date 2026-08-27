@@ -1,4 +1,4 @@
-import { Pipeline } from '../forge/pipeline';
+import { Pipeline } from '../compile/pipeline';
 
 /**
  * WebMCP tool registry — every document.modelContext call in Fabric lives in this
@@ -17,7 +17,7 @@ export interface WebMcpToolDef {
 export interface RegisteredTool {
   def: WebMcpToolDef;
   controller: AbortController;
-  origin: 'core' | 'forged';
+  origin: 'core' | 'compiled';
   pipeline?: Pipeline;
   version: number;
 }
@@ -34,7 +34,7 @@ export function getModelContext(): ModelContext | null {
 }
 
 export type RegistryEvent =
-  | { type: 'registered'; name: string; origin: 'core' | 'forged'; version: number }
+  | { type: 'registered'; name: string; origin: 'core' | 'compiled'; version: number }
   | { type: 'revoked'; name: string }
   | { type: 'swapped'; name: string; version: number }
   | { type: 'unavailable' };
@@ -68,7 +68,7 @@ export class WebMcpRegistry {
     return this.tools.get(name);
   }
 
-  async register(def: WebMcpToolDef, origin: 'core' | 'forged', pipeline?: Pipeline): Promise<void> {
+  async register(def: WebMcpToolDef, origin: 'core' | 'compiled', pipeline?: Pipeline): Promise<void> {
     const mc = getModelContext();
     if (!mc) {
       this.emit({ type: 'unavailable' });

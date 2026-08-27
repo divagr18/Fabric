@@ -5,7 +5,7 @@ import { GrantStore, isImage } from './grants';
 
 export type EmbedStatus =
   | { state: 'idle' }
-  | { state: 'loading'; pct: number }
+  | { state: 'loading'; pct: number; mb?: number; mbTotal?: number }
   | { state: 'ready'; backend: 'webgpu' | 'wasm' }
   | { state: 'error'; error: string };
 
@@ -29,9 +29,11 @@ export class Embedder {
     if (this.worker) return this.worker;
     const w = new Worker(new URL('./embed.worker.ts', import.meta.url), { type: 'module' });
     w.onmessage = (ev) => {
-      const msg = ev.data as { type: string; id?: string; pct?: number; result?: unknown; error?: string };
+      const msg = ev.data as { type: string; id?: string; pct?: number; mb?: number; mbTotal?: number; result?: unknown; error?: string };
       if (msg.type === 'progress') {
-        if (this.status.state !== 'ready') this.setStatus({ state: 'loading', pct: msg.pct ?? 0 });
+        if (this.status.state !== 'ready') {
+          this.setStatus({ state: 'loading', pct: msg.pct ?? 0, mb: msg.mb, mbTotal: msg.mbTotal });
+        }
         return;
       }
       const p = msg.id ? this.pending.get(msg.id) : undefined;
