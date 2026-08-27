@@ -11,7 +11,7 @@
     "typecheck:worker": "tsc -p worker/tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@huggingface/transformers": "^4.2.0",
+    "@huggingface/transformers": "^3.8.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
