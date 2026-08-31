@@ -92,13 +92,22 @@ export class Executor {
     switch (stage.method) {
       case 'host.match': {
         const query = args.query as number[];
-        const items = args.items as Array<{ fileId?: string; vector: number[] } & Record<string, unknown>>;
+        // items may be one stage's list OR an array of refs to several stages'
+        // lists (multi-node search) — flatten one level so both shapes work.
+        const raw = args.items as unknown[];
+        if (!Array.isArray(raw)) throw new Error('host.match: "items" must be an array');
+        const items = raw.flatMap((x) =>
+          Array.isArray(x) ? x : (x && typeof x === 'object' && Array.isArray((x as { items?: unknown[] }).items))
+            ? (x as { items: unknown[] }).items
+            : [x],
+        ) as Array<{ fileId?: string; vector: number[] } & Record<string, unknown>>;
         const topK = typeof args.topK === 'number' ? args.topK : 10;
         if (!Array.isArray(query)) throw new Error('host.match: "query" must be a vector');
-        if (!Array.isArray(items)) throw new Error('host.match: "items" must be an array of {vector,...}');
+        const withVectors = items.filter((it) => Array.isArray(it?.vector));
+        if (withVectors.length === 0) throw new Error('host.match: no items carried vectors');
         const ranked = rankBySimilarity(
           query,
-          items.map((it) => ({ item: it, vector: it.vector })),
+          withVectors.map((it) => ({ item: it, vector: it.vector })),
           topK,
         );
         return { matches: ranked.map((r) => ({ score: Number(r.score.toFixed(4)), ...stripVector(r.item) })) };

@@ -37,7 +37,7 @@ NODE PRIMITIVES (node = a peerId that exposes the method):
 - human.request  args {"kind": "capture"|"decide"|"approve", "prompt": string, "options"?: [string]} → capture: the photo {"name","mime","bytes"}; decide: {"kind","choice"}; approve: {"kind","approved"}  (a real person answers; prompt is shown to them)
 
 HOST OPS (node = "host", run on the coordinating device):
-- host.match  args {"query": vector, "items": [{"vector",...}], "topK"?: number} → {"matches": [{"score", ...item fields}]}
+- host.match  args {"query": vector, "items": <one stage's items, OR an array of $from refs to combine several stages' items, e.g. [{"$from":"a","path":"items"},{"$from":"b","path":"items"}]>, "topK"?: number} → {"matches": [{"score", ...item fields}]}
 - host.pick  args {"value": <usually a $from ref>, "path"?: string, "limit"?: number, "fields"?: [string]} → {"items": [...]}  (selection/projection glue)
 - host.compile_pdf  args {"title": string, "parts": [<$from refs to read/captured files or {"name","text"}>]} → {"artifact", "pages", "bytes"}  (compiled locally, shown in the Fabric UI)
 
