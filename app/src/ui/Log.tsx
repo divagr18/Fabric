@@ -13,10 +13,18 @@ export function Log({ lines }: { lines: string[] }) {
   return (
     <div className="log" ref={el}>
       {lines.map((l, i) => (
-        <div key={i}>{l}</div>
+        <div key={i} className={lineClass(l)}>{l}</div>
       ))}
     </div>
   );
+}
+
+function lineClass(l: string): string {
+  if (l.includes('⚡') || l.includes('🔥') || l.includes('HOT-SWAPPED')) return 'l-spark';
+  if (l.includes('NODE LOST') || l.includes('✗') || l.includes('DEGRADED') || l.includes('failed')) return 'l-bad';
+  if (l.includes('✓') || l.includes(' done')) return 'l-ok';
+  if (l.includes('NODE JOINED') || l.includes('advertises')) return 'l-node';
+  return '';
 }
 
 export function stamp(line: string): string {

@@ -171,13 +171,13 @@ export function HostPage() {
       <span className={`badge status-${status}`}>{status}</span>{' '}
       <span className="dim">room</span> <code>{roomCode}</code>
 
-      <p className="dim" style={{ fontVariantNumeric: 'tabular-nums', margin: '10px 0 0' }}>
-        nodes <strong style={{ color: 'var(--text)' }}>{nodes.length}</strong>
-        {' · '}compiled tools <strong style={{ color: 'var(--text)' }}>{registry.list().filter((t) => t.origin === 'compiled').length}</strong>
-        {' · '}hot reloads <strong style={{ color: 'var(--text)' }}>{hotReloads}</strong>
-        {' · '}peer transfers <strong style={{ color: 'var(--text)' }}>{((hubRef.current?.blobs.bytesReceived ?? 0) / 1024).toFixed(0)} KB</strong>
-        {' · '}raw file bytes to any cloud <strong style={{ color: 'var(--ok)' }}>0 B</strong>
-      </p>
+      <div className="stats">
+        <span className="stat">nodes<b>{nodes.length}</b></span>
+        <span className="stat">compiled tools<b>{registry.list().filter((t) => t.origin === 'compiled').length}</b></span>
+        <span className="stat">hot reloads<b>{hotReloads}</b></span>
+        <span className="stat">peer transfers<b>{((hubRef.current?.blobs.bytesReceived ?? 0) / 1024).toFixed(0)} KB</b></span>
+        <span className="stat stat-zero">raw file bytes to any cloud<b>0 B</b></span>
+      </div>
 
       <div className="row" style={{ marginTop: 16 }}>
         <div className="panel">
@@ -201,7 +201,7 @@ export function HostPage() {
                 </span>
                 <span>
                   {n.caps.map((c) => (
-                    <span key={c.id} className="badge" title={c.detail} style={{ marginRight: 4, marginBottom: 4 }}>
+                    <span key={c.id} className={`badge chip-${c.kind}`} title={c.detail} style={{ marginRight: 4, marginBottom: 4 }}>
                       {c.name}
                     </span>
                   ))}
@@ -231,7 +231,7 @@ export function HostPage() {
             <h2 style={{ marginTop: 0 }}>Execution</h2>
             {stages.map((s) => (
               <p key={s.id} style={{ margin: '4px 0' }}>
-                <span className="badge" style={{
+                <span className={`badge${s.status === 'running' ? ' pulse' : ''}`} style={{
                   color: s.status === 'done' ? 'var(--ok)' : s.status === 'failed' ? 'var(--bad)' : 'var(--accent)',
                   borderColor: s.status === 'done' ? 'var(--ok)' : s.status === 'failed' ? 'var(--bad)' : 'var(--accent)',
                 }}>{s.status}</span>{' '}

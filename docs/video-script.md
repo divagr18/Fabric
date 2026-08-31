@@ -1,67 +1,64 @@
-# Fabric — Demo Voiceover Script (continuous live demo, target 2:50)
+# Fabric — Demo Voiceover Script v3 (continuous live demo, ~2:45)
 
-Style: one continuous live demo, self-narrated. Lines below are timed subtitle beats —
-small lower-third subs, white text on a semi-transparent black box, YouTube style.
-`docs/video/vo_script.srt` is the matching subtitle file.
-
-**Opening is multi-device**: frame the desk so BOTH screens and the phone are visible
-(or picture-in-picture: host screen full + desk cam corner). Devices join ON camera
-in the first seconds — never a single lonely browser.
+Delivery: natural, conversational — showing a friend a side project. Pauses and "uhs" welcome; the timings below leave room for them. Subs: small lower-third, white on 65%-black box, burned in + `docs/video/vo_script.srt` uploaded to YouTube.
 
 ## Segment 1 — Cold open: the machine assembles (0:00)
+[Wide desk shot: laptop + second browser + phone, all joining on camera]
 
-- **0:00** — This is Fabric, running right now. My laptop, a second browser, and my phone — becoming one machine for ChatGPT.
-- **0:08** — Every device shares only what I choose. Watch the phone join... and there it is.
-- **0:15** — I'm Divyansh Agrawal, and this is my entry for the WebMCP Challenge.
+- **0:00** — So right now, this is Fabric running live. That's my laptop, a second browser, and my phone — all linking up into one machine for ChatGPT.
+- **0:09** — Normal WebMCP lets a site expose fixed tools. Fabric lets ChatGPT compile its own — out of whatever devices are on your desk.
+- **0:17** — I'm Divyansh Agrawal, and this is my entry for the WebMCP Challenge.
 
-## Segment 2 — The problem, then the trick (0:21)
+## Segment 2 — The problem, then the trick (0:22)
+[Zoom: ChatGPT tool list — 4 core tools]
 
-- **0:21** — My files, my photos, my compute — scattered across these devices. No agent can touch any of it without me uploading my life to someone's cloud.
-- **0:31** — ChatGPT sees exactly four WebMCP tools here. Fabric's trick? It compiles its own.
-- **0:38** — I ask for a tool that doesn't exist: find photos across my devices by description.
-- **0:45** — A planner maps my devices' shared capabilities into a typed pipeline. No generated code. Ever.
-- **0:53** — And there it is. That tool did not exist ten seconds ago — registered through WebMCP, mid-conversation.
+- **0:22** — Right now, ChatGPT sees just four core tools from this Fabric page.
+- **0:27** — So let's give it something trickier: find photos of my dog across my devices, by description.
+- **0:34** — That tool doesn't exist. Fabric's planner looks at what my devices have shared and builds a typed pipeline — photos on the phone, a local CLIP model to match them. No code generation. No cloud.
+- **0:47** — And... there it is. That tool did not exist ten seconds ago — registered into ChatGPT through WebMCP, mid-conversation.
 
-## Segment 3 — Execution where the data lives (1:02)
+## Segment 3 — Execution where the data lives (0:57)
+[Execution panel stages; PiP phone mirror]
 
-- **1:02** — "Find the dog." Watch the stages — the embeddings are computed on the phone itself.
-- **1:10** — My photos never leave the phone. Only vectors cross, device to device.
-- **1:17** — Look at the counter. Zero bytes of my files to any cloud. That's the entire privacy model.
-- **1:24** — And there's the dog. Ranked first.
+- **0:57** — ChatGPT calls it: find the dog.
+- **1:01** — Watch the stages — the embeddings are computed right on the phone itself.
+- **1:08** — My photos never leave it. Just 512-dimensional vectors moving device to device.
+- **1:15** — And check the counter: zero bytes of my files to any cloud. That's the whole privacy model.
+- **1:22** — Aaand there's the dog. Ranked first.
 
-## Segment 4 — The human is a node (1:30)
+## Segment 4 — The human is a node (1:28)
+[Packet request; phone buzzes; desk cam for the paper]
 
-- **1:30** — Now something harder: assemble my documents into a PDF packet. One certificate only exists on paper.
-- **1:38** — So the pipeline schedules *me*. My phone buzzes — I'm a stage in the execution graph.
-- **1:45** — I photograph the page... and execution continues.
-- **1:52** — The export waits for a human tap. My judgment is routed exactly like my GPU.
-- **1:58** — Approved. There's the packet — compiled on my own machine.
+- **1:28** — Okay, something harder: assemble my documents into a PDF packet. The catch — one form only exists on paper.
+- **1:36** — So Fabric schedules *me*. My phone buzzes — I'm literally a stage in the execution graph.
+- **1:43** — I snap the paper on my desk... and the pipeline picks up right where it left off.
+- **1:50** — One final sign-off — I tap Approve. My judgment, routed like a GPU task.
+- **1:56** — And there's the packet, compiled locally on my machine.
 
-## Segment 5 — Kill a device, keep the tool (2:05)
+## Segment 5 — Kill a device, keep the tool (2:02)
+[Close the node tab on camera; panel flips to v2]
 
-- **2:05** — Now the part that makes this a runtime, not a demo. I'm going to kill a device mid-session.
-- **2:12** — Node lost. Fabric replans the tool onto the devices that remain — and re-registers the same name through WebMCP.
-- **2:22** — ChatGPT calls it again. Same tool. Version two. New machine underneath. Still works.
+- **2:02** — Now the part that proves this is a runtime, not a canned demo. I'm killing a node mid-session.
+- **2:10** — Node lost. Fabric sees the topology change, replans onto the devices that remain — and re-registers the exact same tool.
+- **2:20** — ChatGPT calls it again. Same tool, version two, new hardware underneath. Still works.
 
-## Segment 6 — Close (2:31)
+## Segment 6 — Close (2:28)
+[Full screen: live URL + repo + surface panel]
 
-- **2:31** — Everything you just saw is live at the link below. One laptop and two tabs is enough — Fabric generates sample files for you.
-- **2:40** — WebMCP lets a website declare its tools ahead of time. Fabric lets the agent compile them while it works — out of the devices you already own.
-
-*(ends ~2:48)*
+- **2:28** — Everything you saw is live at the link below — two tabs is enough, and Fabric generates sample files for you.
+- **2:36** — WebMCP gives websites a way to hand agents tools. Fabric hands them the machine to run on — yours.
+- **2:43** — Thanks for watching.
 
 ---
 
-## Production notes
+## Filming the easy way
 
-**Continuous-demo recording**: it should FEEL like one take. Record in 3 blocks with natural cut points (after Segment 2's registration; after Segment 4's packet), same session, same room state — never splice different runs of the same action. Cut the 10–20s planner wait to ~2s of visible "compiling"; a jump cut is honest, a faked timer is not.
+1. **Video first, voice second.** Record the demo footage silent, cut it to the timestamps, then read the VO over the finished picture (exactly your Diligence Room workflow — "burned lines, read straight off it"). Live-narrating while driving three devices is the hard way; don't.
+2. **scrcpy the phone.** USB-mirror the Android screen into a desktop window → crisp phone UI inside OBS, no desk-cam focus hunting. Desk cam only for the two physical beats: the QR scan and photographing the paper.
+3. **OBS scenes + hotkeys**: Scene A = host fullscreen · Scene B = host + phone mirror PiP · Scene C = desk cam. Switching live while recording gives you cuts for free.
+4. **Record each segment 2–3× back-to-back** in one session (same room state), pick best takes. Never splice two different runs of one action.
+5. **Cut the planner wait** to ~2s of "compiling…" — jump cut, not sped-up footage.
+6. Subs: DaVinci/CapCut auto-caption from the SRT, style once (small, lower third, 65% black box), export burned-in.
 
-**Framing**: primary capture = host screen (OBS 1080p+, UI ~125% zoom). Desk cam (phone on a stack of books) for: phone QR-scan (Seg 1), photographing the paper (Seg 4), closing the tab/lid (Seg 5). PiP the desk cam bottom-right when both matter at once.
-
-**Subs**: lower third, small (~40px at 1080p), white on rgba(0,0,0,0.65) box, one beat per card, max 2 lines. Burn them in (judges may watch muted) AND upload the .srt to YouTube.
-
-**Audio**: your own voice, room-quiet, phone notifications off everywhere. Read each beat as its moment happens — the timestamps above assume ~150 wpm with breathing room.
-
-**Pre-flight** (all BEFORE recording): 4 hot-reload tests passed twice · models pre-warmed on every device · fresh ChatGPT session + fresh room · wake lock confirmed on phone · the paper certificate printed and on the desk · dog photo among the shared files.
-
-**Upload**: public YouTube, no music, title "Fabric — ChatGPT compiles its own tools from your devices (WebMCP)", description line 1 = live URL + repo. Thumbnail: host page with 3 node cards + COMPILED v2 badge + the 0 B counter.
+## Pre-flight (all BEFORE recording)
+4 hot-reload tests passed twice · packet path run at least once live · models warm on every device · dog photo + printed paper form staged · notifications off everywhere · fresh ChatGPT session + fresh room.
