@@ -171,6 +171,22 @@ export function HostPage() {
       <span className={`badge status-${status}`}>{status}</span>{' '}
       <span className="dim">room</span> <code>{roomCode}</code>
 
+      <div className="weave" aria-hidden>
+        {nodes.length === 0 && registry.list().filter((t) => t.origin === 'compiled').length === 0 && (
+          <span className="weave-label">no threads yet — nodes and compiled tools appear here</span>
+        )}
+        {nodes.map((n) => (
+          <span
+            key={n.peerId}
+            className={`knot${n.alive ? '' : ' knot-dim'}${n.caps.some((c) => c.kind === 'compute') ? ' knot-compute' : ''}`}
+            title={n.label}
+          />
+        ))}
+        {registry.list().filter((t) => t.origin === 'compiled').map((t) => (
+          <span key={t.def.name} className="knot knot-spark" title={`⚡ ${t.def.name} v${t.version}`} />
+        ))}
+      </div>
+
       <div className="stats">
         <span className="stat">nodes<b>{nodes.length}</b></span>
         <span className="stat">compiled tools<b>{registry.list().filter((t) => t.origin === 'compiled').length}</b></span>
