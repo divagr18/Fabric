@@ -64,6 +64,8 @@ interface InFlight {
 
 /** Assembles incoming blob_* envelopes; await a transfer by id. */
 export class BlobReceiver {
+  /** total bytes received from peers (never a server) — feeds the metrics strip */
+  bytesReceived = 0;
   private inflight = new Map<string, InFlight>();
   private done = new Map<string, ReceivedBlob>();
   private waiters = new Map<string, { resolve: (b: ReceivedBlob) => void; reject: (e: Error) => void }>();
@@ -105,6 +107,7 @@ export class BlobReceiver {
         bytes.set(part, off);
         off += part.length;
       }
+      this.bytesReceived += bytes.length;
       const blob: ReceivedBlob = { transferId: p.transferId, name: t.name, mime: t.mime, bytes };
       const w = this.waiters.get(p.transferId);
       if (w) {

@@ -5,6 +5,7 @@ import { deviceLabel, myPeerId } from '../transport/protocol';
 import { SignalingStatus } from '../transport/signaling';
 import { sendBlob } from '../transport/blob';
 import { GrantStore, supportsFolders } from '../capabilities/grants';
+import { generateSampleFiles } from '../capabilities/samples';
 import { dataList, dataRead } from '../capabilities/data';
 import { Embedder, EmbedStatus } from '../capabilities/embed';
 import { ocrFiles, ocrCapability } from '../capabilities/ocr';
@@ -71,7 +72,25 @@ export function NodePage({ roomCode }: { roomCode: string }) {
     };
     human.onChange = () => bump((n) => n + 1);
     agent.start();
-    return () => agent.stop();
+
+    // Keep the screen (and therefore the node) alive — phones drop off the
+    // fabric when the display sleeps.
+    let lock: { release?: () => Promise<void> } | null = null;
+    const acquireLock = async () => {
+      try {
+        lock = await (navigator as Navigator & { wakeLock?: { request(t: string): Promise<{ release(): Promise<void> }> } })
+          .wakeLock?.request('screen') ?? null;
+      } catch { /* not supported / not visible — best effort */ }
+    };
+    void acquireLock();
+    const onVisible = () => { if (document.visibilityState === 'visible') void acquireLock(); };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      void lock?.release?.();
+      agent.stop();
+    };
   }, [agent, store, embedder, human]);
 
   const grants = store.list();
@@ -109,6 +128,11 @@ export function NodePage({ roomCode }: { roomCode: string }) {
             </button>
           )}
           <button onClick={() => photoInput.current?.click()}>🖼 Share photos</button>
+          <button onClick={async () => {
+            const files = await generateSampleFiles();
+            store.addFiles(files, 'sample files (generated)', 'samples');
+            setLines((p) => [...p, stamp(`shared ${files.length} generated sample files (watermarked SAMPLE)`)]);
+          }}>🧪 Use sample files</button>
           <input
             ref={photoInput}
             type="file"

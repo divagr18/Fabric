@@ -16,7 +16,7 @@ export interface GrantedFile {
 export interface Grant {
   capId: string;
   name: string;
-  kind: 'folder' | 'photos';
+  kind: 'folder' | 'photos' | 'samples';
   files: GrantedFile[];
 }
 
@@ -88,14 +88,18 @@ export class GrantStore {
   }
 
   addPhotos(picked: FileList | File[]): Grant {
-    const capId = `data:photos-${this.grants.size}`;
-    const files: GrantedFile[] = [...picked].map((f, i) => ({
+    return this.addFiles([...picked], 'selected photos', 'photos');
+  }
+
+  addFiles(picked: File[], label: string, kind: 'photos' | 'samples' = 'photos'): Grant {
+    const capId = `data:${kind}-${this.grants.size}`;
+    const files: GrantedFile[] = picked.map((f, i) => ({
       id: `${capId}#${i}`,
       name: f.name,
       mime: f.type || guessMime(f.name),
       getFile: () => Promise.resolve(f),
     }));
-    const grant: Grant = { capId, name: 'selected photos', kind: 'photos', files };
+    const grant: Grant = { capId, name: label, kind, files };
     this.grants.set(capId, grant);
     this.changed();
     return grant;

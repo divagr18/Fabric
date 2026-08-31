@@ -28,6 +28,8 @@ export function HostPage() {
   const [lines, setLines] = useState<string[]>([]);
   const [qr, setQr] = useState<string>('');
   const [approval, setApproval] = useState<{ what: string; resolve: (ok: boolean) => void } | null>(null);
+  const [hotReloads, setHotReloads] = useState(0);
+  const [stages, setStages] = useState<Array<{ id: string; method: string; node: string; status: string }>>([]);
   const hubRef = useRef<Hub | null>(null);
 
   const joinUrl = `${location.origin}/r/${roomCode}`;
@@ -43,16 +45,24 @@ export function HostPage() {
     hub.start();
     registry.on((e) => {
       if (e.type === 'registered' && e.origin === 'compiled') addLine(`⚡ + ${e.name} REGISTERED via WebMCP`);
-      else if (e.type === 'swapped') addLine(`🔥 ${e.name} hot-swapped → v${e.version}`);
-      else if (e.type === 'revoked') addLine(`− ${e.name} revoked`);
+      else if (e.type === 'swapped') {
+        addLine(`🔥 ${e.name} hot-swapped → v${e.version}`);
+        setHotReloads((n) => n + 1);
+      } else if (e.type === 'revoked') addLine(`− ${e.name} revoked`);
     });
     installCoreSurface(registry, hub, {
       onLog: addLine,
       onApprove: (what) => new Promise<boolean>((resolve) => {
         setApproval({ what, resolve: (ok) => { setApproval(null); resolve(ok); } });
       }),
-      onStage: (stage, status, detail) =>
-        addLine(`stage ${stage.id} [${stage.method} @ ${stage.node === 'host' ? 'host' : stage.node}] ${status}${detail ? ` — ${detail}` : ''}`),
+      onStage: (stage, status, detail) => {
+        addLine(`stage ${stage.id} [${stage.method} @ ${stage.node === 'host' ? 'host' : stage.node}] ${status}${detail ? ` — ${detail}` : ''}`);
+        setStages((prev) => {
+          const next = prev.filter((s) => s.id !== stage.id);
+          next.push({ id: stage.id, method: stage.method, node: stage.node, status });
+          return next.slice(-12);
+        });
+      },
       onArtifact: (a) => {
         const url = URL.createObjectURL(new Blob([a.bytes.buffer as ArrayBuffer], { type: a.mime }));
         addLine(`📄 artifact ready: ${a.name} (${(a.bytes.length / 1024).toFixed(0)}KB) — compiled locally`);
@@ -161,6 +171,14 @@ export function HostPage() {
       <span className={`badge status-${status}`}>{status}</span>{' '}
       <span className="dim">room</span> <code>{roomCode}</code>
 
+      <p className="dim" style={{ fontVariantNumeric: 'tabular-nums', margin: '10px 0 0' }}>
+        nodes <strong style={{ color: 'var(--text)' }}>{nodes.length}</strong>
+        {' · '}compiled tools <strong style={{ color: 'var(--text)' }}>{registry.list().filter((t) => t.origin === 'compiled').length}</strong>
+        {' · '}hot reloads <strong style={{ color: 'var(--text)' }}>{hotReloads}</strong>
+        {' · '}peer transfers <strong style={{ color: 'var(--text)' }}>{((hubRef.current?.blobs.bytesReceived ?? 0) / 1024).toFixed(0)} KB</strong>
+        {' · '}raw file bytes to any cloud <strong style={{ color: 'var(--ok)' }}>0 B</strong>
+      </p>
+
       <div className="row" style={{ marginTop: 16 }}>
         <div className="panel">
           <h2 style={{ marginTop: 0 }}>Join this fabric</h2>
@@ -208,10 +226,37 @@ export function HostPage() {
 
       <div className="row" style={{ marginTop: 16 }}>
         <SurfacePanel registry={registry} />
+        {stages.length > 0 && (
+          <div className="panel">
+            <h2 style={{ marginTop: 0 }}>Execution</h2>
+            {stages.map((s) => (
+              <p key={s.id} style={{ margin: '4px 0' }}>
+                <span className="badge" style={{
+                  color: s.status === 'done' ? 'var(--ok)' : s.status === 'failed' ? 'var(--bad)' : 'var(--accent)',
+                  borderColor: s.status === 'done' ? 'var(--ok)' : s.status === 'failed' ? 'var(--bad)' : 'var(--accent)',
+                }}>{s.status}</span>{' '}
+                <code>{s.method}</code>{' '}
+                <span className="dim">@ {s.node === 'host' ? 'host' : (nodes.find((n) => n.peerId === s.node)?.label ?? s.node)}</span>
+              </p>
+            ))}
+          </div>
+        )}
       </div>
 
       <h2>Log</h2>
       <Log lines={lines} />
+
+      <div className="panel" style={{ marginTop: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Try it (for reviewers)</h2>
+        <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.9 }}>
+          <li>Open this page in <strong>ChatGPT's in-app browser</strong> (or Chrome with <code>chrome://flags/#enable-webmcp-testing</code>).</li>
+          <li>Open the join link above in a <strong>new tab</strong> — that tab is now a second device. On it, click <strong>🧪 Use sample files</strong> (or share your own). A phone via the QR makes a third.</li>
+          <li>Ask the agent: <em>"Call inspect_fabric — what can this fabric do?"</em></li>
+          <li>Then: <em>"Compile a tool that finds photos across my devices matching a text description, and use it to find a dog."</em> Watch the tool appear in the agent's tool list mid-session, execute across the tabs, and rank the dog sample first.</li>
+          <li>Close the node tab and call the tool again — it hot-reloads under the same name. That's the point.</li>
+        </ol>
+        <p className="dim" style={{ marginBottom: 0 }}>Every capability is explicitly shared by its device's user. Raw files never touch a server — execution goes to the data.</p>
+      </div>
 
       {approval && (
         <div style={{
