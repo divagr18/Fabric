@@ -195,83 +195,86 @@ export function HostPage() {
         <span className="stat stat-zero">raw file bytes to any cloud<b>0 B</b></span>
       </div>
 
-      <div className="row" style={{ marginTop: 16 }}>
-        <div className="panel">
-          <h2 style={{ marginTop: 0 }}>Join this fabric</h2>
-          {qr && <img className="qr" src={qr} alt={`QR code for ${joinUrl}`} />}
-          <p>
-            <code>{joinUrl}</code>
-          </p>
-          <p className="dim">Scan with a phone, or open in a new tab — every browser becomes a node.</p>
-        </div>
-        <div className="panel">
-          <h2 style={{ marginTop: 0 }}>Nodes ({nodes.length})</h2>
-          {nodes.length === 0 && <p className="dim">none yet — waiting</p>}
-          <div className="nodes-grid">
-            {nodes.map((n) => (
-              <div key={n.peerId} className={`node-card${n.alive ? '' : ' stale'}`}>
-                <strong>{n.label}</strong>
-                <span>
-                  <span className={`badge ${n.kind}`}>{n.kind}</span>{' '}
-                  {!n.alive && <span className="badge">stale</span>}
-                </span>
-                <span>
-                  {n.caps.map((c) => (
-                    <span key={c.id} className={`badge chip-${c.kind}`} title={c.detail} style={{ marginRight: 4, marginBottom: 4 }}>
-                      {c.name}
-                    </span>
-                  ))}
-                  {n.caps.length === 0 && <span className="dim">nothing shared yet</span>}
-                </span>
-                <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {tests.map((t) => (
-                    <button
-                      key={t.name}
-                      style={{ padding: '4px 8px', fontSize: 12 }}
-                      onClick={() => run(`${t.name} @ ${n.label}`, () => t.fn(hubRef.current!, n))}
-                    >
-                      {t.name}
-                    </button>
-                  ))}
-                </span>
-              </div>
-            ))}
+      <div className="layout">
+        <div className="col">
+          <div className="panel">
+            <h2>Join this fabric</h2>
+            <p className="roomcode">{roomCode}</p>
+            {qr && <img className="qr" src={qr} alt={`QR code for ${joinUrl}`} />}
+            <p style={{ fontSize: 12 }}><code>{joinUrl}</code></p>
+            <p className="dim" style={{ marginBottom: 0 }}>Scan with a phone, or open in a new tab — every browser becomes a node.</p>
+          </div>
+          <div className="panel">
+            <h2>Try it</h2>
+            <ol className="steps">
+              <li>Open this page in <strong>ChatGPT's browser</strong> (or Chrome + <code>#enable-webmcp-testing</code>).</li>
+              <li>Open the join link in a <strong>new tab</strong> → click <strong>🧪 Use sample files</strong>. Phone via QR = third device.</li>
+              <li>Ask: <em>"Call inspect_fabric — what can this fabric do?"</em></li>
+              <li>Then: <em>"Compile a tool that finds photos across my devices by description — find the dog."</em> Watch the tool appear mid-session and rank the dog first.</li>
+              <li>Close the node tab, call it again — it <strong>hot-reloads</strong> under the same name. That's the point.</li>
+            </ol>
+            <p className="dim" style={{ marginBottom: 0, fontSize: 12 }}>Every capability is explicitly shared. Raw files never touch a server — execution goes to the data.</p>
           </div>
         </div>
-      </div>
 
-      <div className="row" style={{ marginTop: 16 }}>
-        <SurfacePanel registry={registry} />
-        {stages.length > 0 && (
+        <div className="col">
           <div className="panel">
-            <h2 style={{ marginTop: 0 }}>Execution</h2>
+            <h2>Nodes<span className="count">{nodes.length}</span></h2>
+            {nodes.length === 0 && <p className="dim">none yet — waiting for devices</p>}
+            <div className="nodes-grid">
+              {nodes.map((n) => (
+                <div key={n.peerId} className={`node-card${n.alive ? '' : ' stale'}`}>
+                  <strong>{n.label}</strong>
+                  <span>
+                    <span className={`badge ${n.kind}`}>{n.kind}</span>{' '}
+                    {!n.alive && <span className="badge">stale</span>}
+                  </span>
+                  <span>
+                    {n.caps.map((c) => (
+                      <span key={c.id} className={`badge chip-${c.kind}`} title={c.detail} style={{ marginRight: 4, marginBottom: 4 }}>
+                        {c.name}
+                      </span>
+                    ))}
+                    {n.caps.length === 0 && <span className="dim">nothing shared yet</span>}
+                  </span>
+                  <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {tests.map((t) => (
+                      <button
+                        key={t.name}
+                        style={{ padding: '4px 8px', fontSize: 12 }}
+                        onClick={() => run(`${t.name} @ ${n.label}`, () => t.fn(hubRef.current!, n))}
+                      >
+                        {t.name}
+                      </button>
+                    ))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="panel">
+            <h2>Log<span className="live-dot" aria-hidden /></h2>
+            <Log lines={lines} />
+          </div>
+        </div>
+
+        <div className="col">
+          <SurfacePanel registry={registry} />
+          <div className="panel">
+            <h2>Execution</h2>
+            {stages.length === 0 && <p className="dim" style={{ margin: 0 }}>stages light up here when a compiled tool runs</p>}
             {stages.map((s) => (
               <p key={s.id} style={{ margin: '4px 0' }}>
                 <span className={`badge${s.status === 'running' ? ' pulse' : ''}`} style={{
-                  color: s.status === 'done' ? 'var(--ok)' : s.status === 'failed' ? 'var(--bad)' : 'var(--accent)',
-                  borderColor: s.status === 'done' ? 'var(--ok)' : s.status === 'failed' ? 'var(--bad)' : 'var(--accent)',
+                  color: s.status === 'done' ? 'var(--ok)' : s.status === 'failed' ? 'var(--bad)' : 'var(--compute)',
+                  borderColor: s.status === 'done' ? 'var(--ok)' : s.status === 'failed' ? 'var(--bad)' : 'var(--compute)',
                 }}>{s.status}</span>{' '}
                 <code>{s.method}</code>{' '}
                 <span className="dim">@ {s.node === 'host' ? 'host' : (nodes.find((n) => n.peerId === s.node)?.label ?? s.node)}</span>
               </p>
             ))}
           </div>
-        )}
-      </div>
-
-      <h2>Log</h2>
-      <Log lines={lines} />
-
-      <div className="panel" style={{ marginTop: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Try it (for reviewers)</h2>
-        <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.9 }}>
-          <li>Open this page in <strong>ChatGPT's in-app browser</strong> (or Chrome with <code>chrome://flags/#enable-webmcp-testing</code>).</li>
-          <li>Open the join link above in a <strong>new tab</strong> — that tab is now a second device. On it, click <strong>🧪 Use sample files</strong> (or share your own). A phone via the QR makes a third.</li>
-          <li>Ask the agent: <em>"Call inspect_fabric — what can this fabric do?"</em></li>
-          <li>Then: <em>"Compile a tool that finds photos across my devices matching a text description, and use it to find a dog."</em> Watch the tool appear in the agent's tool list mid-session, execute across the tabs, and rank the dog sample first.</li>
-          <li>Close the node tab and call the tool again — it hot-reloads under the same name. That's the point.</li>
-        </ol>
-        <p className="dim" style={{ marginBottom: 0 }}>Every capability is explicitly shared by its device's user. Raw files never touch a server — execution goes to the data.</p>
+        </div>
       </div>
 
       {approval && (
