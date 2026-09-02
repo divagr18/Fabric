@@ -117,7 +117,14 @@ export class GrantStore {
     return this.grants.get(capId);
   }
 
-  getFile(fileId: string): GrantedFile | undefined {
+  getFile(ref: unknown): GrantedFile | undefined {
+    // Accept an id string OR a file entry ({id: ...}) — planners pass both shapes.
+    const fileId = typeof ref === 'string'
+      ? ref
+      : (ref && typeof ref === 'object' && typeof (ref as { id?: unknown }).id === 'string')
+        ? (ref as { id: string }).id
+        : null;
+    if (!fileId) return undefined; // null/garbage refs from bad plans must not crash
     const capId = fileId.split('#')[0];
     return this.grants.get(capId)?.files.find((f) => f.id === fileId);
   }

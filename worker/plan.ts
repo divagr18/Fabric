@@ -33,7 +33,7 @@ NODE PRIMITIVES (node = a peerId that exposes the method):
 - data.read  args {"fileId": string} → the file itself; downstream sees {"name","mime","bytes"}
 - compute.embed  args {"capId"?: string, "fileIds"?: [string], "limit"?: number} → {"items": [{"fileId","vector"}], "backend", "ms"}  (CLIP image embeddings of granted images, computed on that node)
 - compute.embed_text  args {"texts": [string]} → {"vectors": [[number]]}  (CLIP text embeddings, same space as images)
-- compute.ocr  args {"fileIds": [string]} → {"items": [{"fileId","text","confidence"}]}
+- compute.ocr  args {"fileIds": [string]} → {"items": [{"fileId","text","confidence"}]}  (fileIds also accepts the file entries from a data.list result directly, e.g. {"fileIds": {"$from": "list_stage", "path": "files"}})
 - human.request  args {"kind": "capture"|"decide"|"approve", "prompt": string, "options"?: [string]} → capture: the photo {"name","mime","bytes"}; decide: {"kind","choice"}; approve: {"kind","approved"}  (a real person answers; prompt is shown to them)
 - human.notify  args {"message": string} → {"delivered": true}  (one-way, non-blocking toast on that device — use to keep the person informed, e.g. after a long step completes)
 
@@ -51,6 +51,7 @@ RULES:
 6. Any "find/search/similar/matching images" goal means: compute.embed_text for the query text, compute.embed for each node's images, host.match to rank (CLIP vectors share one space). This is fully automatic — no human involved.
 7. inputSchema must declare every {"$input"} field used. Prefer few, meaningful inputs.
 8. Raw data never leaves the device network; there is no cloud. Do not invent upload/download/network methods.
+9. A human.request capture returns the PHOTO ITSELF ({"name","mime","bytes"}) delivered to the host — it is NOT a granted file and has NO fileId. NEVER pass a captured photo to compute.ocr or compute.embed (those operate only on granted fileIds). A captured photo may ONLY be used as a part in host.compile_pdf, e.g. "parts": [{"$from": "capture_stage"}].
 
 If prior validation errors are provided, fix exactly those errors and change nothing else.
 
