@@ -89,6 +89,8 @@ export async function handlePlan(request: Request, env: PlanEnv): Promise<Respon
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
+    // bounded so a hung upstream fails with a clean error instead of stalling the compile
+    signal: AbortSignal.timeout(120_000),
     headers: {
       'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
       'Content-Type': 'application/json',
