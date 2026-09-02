@@ -63,6 +63,7 @@ async function indexDirectory(dir: FileSystemDirectoryHandle, capId: string): Pr
 
 export class GrantStore {
   private grants = new Map<string, Grant>();
+  private seq = 0; // monotonic — grants.size would collide after a revoke
   private listeners: Array<() => void> = [];
 
   onChange(cb: () => void) {
@@ -79,7 +80,7 @@ export class GrantStore {
 
   async addFolder(): Promise<Grant> {
     const dir = await (window as unknown as { showDirectoryPicker(): Promise<FileSystemDirectoryHandle> }).showDirectoryPicker();
-    const capId = `data:${dir.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'folder'}-${this.grants.size}`;
+    const capId = `data:${dir.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'folder'}-${this.seq++}`;
     const files = await indexDirectory(dir, capId);
     const grant: Grant = { capId, name: `${dir.name}/`, kind: 'folder', files };
     this.grants.set(capId, grant);
@@ -92,7 +93,7 @@ export class GrantStore {
   }
 
   addFiles(picked: File[], label: string, kind: 'photos' | 'samples' = 'photos'): Grant {
-    const capId = `data:${kind}-${this.grants.size}`;
+    const capId = `data:${kind}-${this.seq++}`;
     const files: GrantedFile[] = picked.map((f, i) => ({
       id: `${capId}#${i}`,
       name: f.name,

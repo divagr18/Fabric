@@ -103,6 +103,12 @@ export class NodeAgent {
 
   private async dispatch(env: Envelope & { type: 'rpc_request' }) {
     const { method, args } = env.payload;
+    if (method === 'fabric.advertise') {
+      // built-in: the host asks us to resend capabilities (e.g. after it reloaded)
+      this.advertise();
+      this.link.send({ type: 'rpc_response', payload: { ok: true, result: { advertised: true } } }, env.id);
+      return;
+    }
     const handler = this.handlers.get(method);
     try {
       if (!handler) throw new Error(`this node does not serve ${method}`);

@@ -35,6 +35,16 @@ export class RoomDO implements DurableObject {
     const role = url.searchParams.get('role') === 'host' ? 'host' : 'node';
     const label = (url.searchParams.get('label') ?? 'device').slice(0, 40);
 
+    // One host per room: role is client-claimed, so without this, anyone with the
+    // room code could claim host and write/erase the fabric's persisted tools.
+    if (role === 'host') {
+      const rival = this.state.getWebSockets().find((ws) => {
+        const m = this.meta(ws);
+        return m?.role === 'host' && m.peerId !== peerId;
+      });
+      if (rival) return new Response('room already has a host', { status: 409 });
+    }
+
     // One connection per peerId: close any stale socket for the same peer (reconnects).
     for (const ws of this.state.getWebSockets()) {
       const meta = this.meta(ws);

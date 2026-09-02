@@ -84,6 +84,11 @@ export class Executor {
   private async runNodeStage(stage: Stage, args: Record<string, unknown>): Promise<unknown> {
     const method = stage.method === 'compute.embed_text' ? 'compute.embed_text' : stage.method;
     const result = await this.hub.rpc(stage.node, method, args) as Record<string, unknown> | null;
+    // A human saying no is a failure of the stage, never a silent success.
+    if (result && typeof result === 'object') {
+      if (result.kind === 'declined') throw new Error('the person declined the request');
+      if (result.kind === 'approve' && result.approved === false) throw new Error('the person denied approval');
+    }
     // data.read and human capture answer with a transfer — await the actual bytes.
     if (result && typeof result === 'object' && typeof result.transferId === 'string') {
       const blob = await this.hub.blobs.waitFor(result.transferId);
@@ -137,7 +142,8 @@ export class Executor {
         );
         const matches = ranked.map((r) => ({ score: Number(r.score.toFixed(4)), ...stripVector(r.item) }));
         void this.fetchPreview(matches[0]);
-        return { matches };
+        // Never hide dropped candidates — mis-wired pipelines must be visible.
+        return { matches, considered: items.length, without_vectors_dropped: items.length - withVectors.length };
       }
       case 'host.pick': {
         // glue: select a path, then optionally filter, slice and project fields

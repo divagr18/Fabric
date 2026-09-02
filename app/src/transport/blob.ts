@@ -68,6 +68,7 @@ export class BlobReceiver {
   bytesReceived = 0;
   private inflight = new Map<string, InFlight>();
   private done = new Map<string, ReceivedBlob>();
+  private failed = new Map<string, string>(); // failures must survive until a waiter shows up
   private waiters = new Map<string, { resolve: (b: ReceivedBlob) => void; reject: (e: Error) => void }>();
 
   /** Returns true if the envelope was a blob message (consumed). */
@@ -128,6 +129,9 @@ export class BlobReceiver {
     if (w) {
       this.waiters.delete(transferId);
       w.reject(new Error(reason));
+    } else {
+      this.failed.set(transferId, reason);
+      setTimeout(() => this.failed.delete(transferId), STALL_MS);
     }
   }
 
@@ -136,6 +140,11 @@ export class BlobReceiver {
     if (ready) {
       this.done.delete(transferId);
       return Promise.resolve(ready);
+    }
+    const failure = this.failed.get(transferId);
+    if (failure) {
+      this.failed.delete(transferId);
+      return Promise.reject(new Error(failure));
     }
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {

@@ -158,6 +158,12 @@ export class Hub {
       case 'signal': {
         const entry = env.from !== 'room' ? this.nodes.get(env.from) : undefined;
         if (!entry) return;
+        // A fresh offer from a peer we already track means the peer restarted:
+        // tear down the old session or the offer would feed a dead connection.
+        if (env.payload.kind === 'offer' && entry.link.rtc) {
+          entry.link.rtc.close();
+          entry.link.rtc = null;
+        }
         if (!entry.link.rtc) {
           entry.link.rtc = new RtcSession({
             role: 'responder',
@@ -229,6 +235,9 @@ export class Hub {
         });
         this.emit('log', `NODE JOINED: ${peer.label}`);
         this.emit('graphChanged', { kind: 'node_joined', peerId: peer.peerId, label: peer.label });
+        // Ask the node to (re-)advertise — covers host reloads, where the node's
+        // socket never dropped and it would otherwise never resend its capabilities.
+        this.nodes.get(peer.peerId)!.link.send({ type: 'rpc_request', payload: { method: 'fabric.advertise', args: {} } });
       }
     }
     for (const [peerId, entry] of this.nodes) {

@@ -40,6 +40,7 @@ export class HotReloadManager {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private pending: GraphChange[] = [];
   private lastReplanAt = new Map<string, number>();
+  private retryScheduled = new Set<string>();
   private sweeping = false;
 
   constructor(private deps: HotReloadDeps) {}
@@ -93,6 +94,8 @@ export class HotReloadManager {
       }
     } finally {
       this.sweeping = false;
+      // Changes that arrived mid-sweep must not rot in the queue.
+      if (this.pending.length > 0) setTimeout(() => void this.sweep(), 150);
     }
   }
 
@@ -101,7 +104,19 @@ export class HotReloadManager {
     const tool = this.deps.registry.get(name);
     if (!tool?.pipeline || !tool.goal) return false;
     const last = this.lastReplanAt.get(name) ?? 0;
-    if (Date.now() - last < REPLAN_COOLDOWN_MS) return false;
+    const wait = REPLAN_COOLDOWN_MS - (Date.now() - last);
+    if (wait > 0) {
+      // Don't drop the request — a node that bounced within the cooldown window
+      // would otherwise leave its tools degraded forever. Retry once after it.
+      if (!this.retryScheduled.has(name)) {
+        this.retryScheduled.add(name);
+        setTimeout(() => {
+          this.retryScheduled.delete(name);
+          void this.replanTool(name);
+        }, wait + 200);
+      }
+      return false;
+    }
     this.lastReplanAt.set(name, Date.now());
 
     const graph = this.deps.hub.getGraph();

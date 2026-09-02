@@ -112,7 +112,11 @@ export class WebMcpRegistry {
             const t = this.tools.get(def.name);
             if (t) t.lastMs = ms;
             this.emit({ type: 'call_end', name: def.name, ok: true, ms, callId });
-            return { content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }] };
+            const text = typeof result === 'string'
+              ? result
+              // never expand raw bytes into JSON — a 5MB file would become tens of MB of digits
+              : JSON.stringify(result, (_k, v) => (v instanceof Uint8Array ? `<binary: ${v.length} bytes, kept on-device>` : v), 2);
+            return { content: [{ type: 'text', text }] };
           } catch (err) {
             this.emit({ type: 'call_end', name: def.name, ok: false, ms: Math.round(performance.now() - t0), callId });
             throw err;
