@@ -211,6 +211,43 @@ export function installCoreSurface(
   }
 
   void registry.register({
+    name: 'inspect_tool',
+    description: 'See how a compiled tool actually works: its pipeline of typed stages, which device each stage runs on, and its version/health. Compiled tools are data, not generated code — this returns the ground truth.',
+    inputSchema: {
+      type: 'object',
+      properties: { tool_name: { type: 'string' } },
+      required: ['tool_name'],
+    },
+    execute: async (args) => {
+      const name = String(args.tool_name ?? '');
+      const tool = registry.get(name);
+      if (!tool || tool.origin !== 'compiled' || !tool.pipeline) {
+        throw new Error(`"${name}" is not a compiled tool (see inspect_fabric for the list)`);
+      }
+      const graph = hub.getGraph();
+      const labelOf = (peerId: string) =>
+        peerId === 'host' ? 'host' : (graph.nodes.find((n) => n.peerId === peerId)?.label ?? `${peerId} (offline)`);
+      return {
+        name,
+        version: tool.version,
+        health: tool.health,
+        goal: tool.goal,
+        calls: tool.calls,
+        last_run_ms: tool.lastMs,
+        input_schema: tool.pipeline.inputSchema,
+        stages: tool.pipeline.stages.map((s) => ({
+          id: s.id,
+          method: s.method,
+          runs_on: labelOf(s.node),
+          args: s.args,
+          depends_on: s.dependsOn,
+        })),
+        note: 'This pipeline was planned at compile time and is re-planned (same name, same schema) whenever the device topology changes.',
+      };
+    },
+  }, 'core');
+
+  void registry.register({
     name: 'revoke_tool',
     description: 'Remove a previously compiled tool from this fabric.',
     inputSchema: {

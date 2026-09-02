@@ -140,10 +140,17 @@ export class Executor {
         return { matches };
       }
       case 'host.pick': {
-        // glue: select a path, then optionally slice and project fields
+        // glue: select a path, then optionally filter, slice and project fields
         const from = args.value;
         const picked = pluck(from, typeof args.path === 'string' ? args.path : undefined);
         let arr = Array.isArray(picked) ? picked : picked === undefined ? [] : [picked];
+        if (args.match && typeof args.match === 'object') {
+          const { field, contains } = args.match as { field?: string; contains?: string };
+          if (typeof field === 'string' && typeof contains === 'string') {
+            const needle = contains.toLowerCase();
+            arr = arr.filter((it) => String(pluck(it, field) ?? '').toLowerCase().includes(needle));
+          }
+        }
         if (typeof args.limit === 'number') arr = arr.slice(0, args.limit);
         if (Array.isArray(args.fields)) {
           const fields = args.fields as string[];
