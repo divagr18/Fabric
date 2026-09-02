@@ -162,7 +162,7 @@ export function installCoreSurface(
 
   void registry.register({
     name: 'compile_tool',
-    description: 'Create a new tool that does not exist yet. Describe the goal; Fabric plans a pipeline across the connected devices\' shared capabilities, validates it, and registers the new tool on this page mid-session. Check your tool list afterwards — the tool will be there and you can call it immediately.',
+    description: 'Create a new tool that does not exist yet. Describe the goal; Fabric plans a pipeline across the connected devices\' shared capabilities, validates it, and registers the new tool on this page mid-session. Planning takes 20-45 seconds: this call may return {status:"compiling"} while work continues in the background — in that case wait briefly, confirm via inspect_fabric, then call the new tool. Never retry compile_tool for the same goal.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -184,7 +184,11 @@ export function installCoreSurface(
       });
       const base = { goal, constraints: args.constraints, graph, existingTools: registry.names() };
 
-      try {
+      // The agent client's transport (CDP Runtime.evaluate) times out long tool
+      // calls. Compilation can take 20-45s, so: race an 8s window — finish fast
+      // and return the full result, or hand back a "compiling" status while the
+      // job completes and registers in the background.
+      const compileJob = (async () => {
         let pipeline = await planOnce(base);
         let verdict = validatePipeline(pipeline, graph, registry.names());
         if (!verdict.ok) {
@@ -195,15 +199,35 @@ export function installCoreSurface(
         if (!verdict.ok) {
           throw new Error(`could not compile a valid pipeline: ${verdict.errors.join('; ')}`);
         }
-
         await registerCompiled(pipeline, goal);
         log(`⚡ ${pipeline.toolName} REGISTERED (${pipeline.stages.length} stages)`);
         events.onBanner?.({ kind: 'registered', text: `⚡ ${pipeline.toolName} REGISTERED VIA WEBMCP` });
-        return await afterRegister(pipeline);
-      } catch (err) {
+        return afterRegister(pipeline);
+      })();
+
+      const PENDING = Symbol('pending');
+      const raced = await Promise.race([
+        compileJob,
+        new Promise<typeof PENDING>((r) => setTimeout(() => r(PENDING), 8_000)),
+      ]).catch((err) => {
         events.onBanner?.(null);
         throw err;
-      }
+      });
+      if (raced !== PENDING) return raced;
+
+      // Still planning — detach: the job keeps running and will register the tool.
+      compileJob.catch((err) => {
+        events.onBanner?.(null);
+        log(`compile failed in background: ${(err as Error).message}`);
+      });
+      return {
+        status: 'compiling',
+        goal,
+        note: 'Compilation is still running in the background (planning takes 20-45s). '
+          + 'The new tool WILL register on this page within about a minute. '
+          + 'Wait briefly, then call inspect_fabric to see it under compiled tools — and then call it directly. '
+          + 'Do NOT retry compile_tool for this goal.',
+      };
     },
   }, 'core');
 
