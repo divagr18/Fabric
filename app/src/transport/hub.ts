@@ -77,23 +77,42 @@ export class Hub {
     this.signaling.onMessage = (env) => this.handle(env);
   }
 
-  on<K extends keyof HubEvents>(event: K, cb: HubEvents[K]) {
+  on<K extends keyof HubEvents>(event: K, cb: HubEvents[K]): () => void {
     this.listeners[event].push(cb);
+    return () => {
+      const arr = this.listeners[event];
+      const i = arr.indexOf(cb);
+      if (i >= 0) arr.splice(i, 1);
+    };
   }
 
   private emit<K extends keyof HubEvents>(event: K, ...args: Parameters<HubEvents[K]>) {
     for (const cb of this.listeners[event]) (cb as (...a: unknown[]) => void)(...args);
   }
 
+  private started = false;
+
+  /** Idempotent — StrictMode/HMR remounts may start/stop repeatedly. */
   start() {
+    if (this.started) return;
+    this.started = true;
     this.signaling.connect();
     this.heartbeat = setInterval(() => this.tick(), HEARTBEAT_MS);
     this.emit('log', `room ${this.roomCode} open — waiting for nodes`);
   }
 
   stop() {
+    if (!this.started) return;
+    this.started = false;
     if (this.heartbeat) clearInterval(this.heartbeat);
     for (const entry of this.nodes.values()) entry.link.close();
+    this.nodes.clear(); // a restart must rebuild entries from a fresh roster
+    for (const [id, p] of this.pending) {
+      clearTimeout(p.timer);
+      p.reject(new Error('hub stopped'));
+      this.pending.delete(id);
+    }
+    this.pings.clear();
     this.signaling.close();
   }
 

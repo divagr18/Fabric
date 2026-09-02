@@ -33,8 +33,13 @@ export class NodeAgent {
     this.signaling.onMessage = (env) => this.handle(env);
   }
 
-  on<K extends keyof NodeEvents>(event: K, cb: NodeEvents[K]) {
+  on<K extends keyof NodeEvents>(event: K, cb: NodeEvents[K]): () => void {
     this.listeners[event].push(cb);
+    return () => {
+      const arr = this.listeners[event];
+      const i = arr.indexOf(cb);
+      if (i >= 0) arr.splice(i, 1);
+    };
   }
 
   private emit<K extends keyof NodeEvents>(event: K, ...args: Parameters<NodeEvents[K]>) {
@@ -45,11 +50,18 @@ export class NodeAgent {
     this.handlers.set(method, handler);
   }
 
+  private startedFlag = false;
+
+  /** Idempotent — StrictMode/HMR remounts may start/stop repeatedly. */
   start() {
+    if (this.startedFlag) return;
+    this.startedFlag = true;
     this.signaling.connect();
   }
 
   stop() {
+    if (!this.startedFlag) return;
+    this.startedFlag = false;
     this.link.close();
     this.signaling.close();
   }

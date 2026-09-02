@@ -66,8 +66,11 @@ export class GrantStore {
   private seq = 0; // monotonic — grants.size would collide after a revoke
   private listeners: Array<() => void> = [];
 
-  onChange(cb: () => void) {
+  onChange(cb: () => void): () => void {
     this.listeners.push(cb);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== cb);
+    };
   }
 
   private changed() {

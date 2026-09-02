@@ -55,8 +55,11 @@ export class WebMcpRegistry {
     this.available = getModelContext() !== null;
   }
 
-  on(cb: (e: RegistryEvent) => void) {
+  on(cb: (e: RegistryEvent) => void): () => void {
     this.listeners.push(cb);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== cb);
+    };
   }
 
   private emit(e: RegistryEvent) {

@@ -35,20 +35,21 @@ export function HostPage() {
   const [preview, setPreview] = useState<{ url: string; name: string; score?: number } | null>(null);
   const [artifact, setArtifact] = useState<{ url: string; name: string } | null>(null);
   const [agentCalls, setAgentCalls] = useState<Array<{ callId: string; name: string; args: string; status: 'running' | 'ok' | 'err'; ms?: number }>>([]);
-  const hubRef = useRef<Hub | null>(null);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const surfaceInstalled = useRef(false);
 
   const joinUrl = `${location.origin}/r/${roomCode}`;
   const registry = useMemo(() => new WebMcpRegistry(), []);
+  const hub = useMemo(() => new Hub(roomCode, myPeerId(), deviceLabel()), [roomCode]);
 
   useEffect(() => {
-    const hub = new Hub(roomCode, myPeerId(), deviceLabel());
-    hubRef.current = hub;
     const addLine = (l: string) => setLines((prev) => [...prev.slice(-199), stamp(l)]);
-    hub.on('log', addLine);
-    hub.on('nodes', setNodes);
-    hub.on('status', setStatus);
-    registry.on((e) => {
+    const unsubs = [
+      hub.on('log', addLine),
+      hub.on('nodes', setNodes),
+      hub.on('status', setStatus),
+    ];
+    unsubs.push(registry.on((e) => {
       if (e.type === 'registered' && e.origin === 'compiled') addLine(`⚡ + ${e.name} REGISTERED via WebMCP`);
       else if (e.type === 'swapped') {
         addLine(`🔥 ${e.name} hot-swapped → v${e.version}`);
@@ -61,8 +62,12 @@ export function HostPage() {
       } else if (e.type === 'call_end') {
         setAgentCalls((prev) => prev.map((c) => c.callId === e.callId ? { ...c, status: e.ok ? 'ok' as const : 'err' as const, ms: e.ms } : c));
       }
-    });
-    installCoreSurface(registry, hub, {
+    }));
+    // Core tools + hot-reload manager attach exactly once — hub identity is
+    // stable across StrictMode/HMR remounts, so this is safe.
+    if (!surfaceInstalled.current) {
+      surfaceInstalled.current = true;
+      installCoreSurface(registry, hub, {
       onLog: addLine,
       onApprove: (what) => new Promise<boolean>((resolve) => {
         // FIFO queue — a second concurrent approval must never orphan the first
@@ -109,12 +114,16 @@ export function HostPage() {
         link.download = a.name;
         link.click();
       },
-    });
+      });
+    }
     // Start AFTER the surface attaches its listeners — stored_tools arrives
     // moments after the socket opens.
     hub.start();
-    return () => hub.stop();
-  }, [roomCode, registry]);
+    return () => {
+      unsubs.forEach((u) => u());
+      hub.stop();
+    };
+  }, [roomCode, registry, hub]);
 
   useEffect(() => {
     QRCode.toDataURL(joinUrl, { width: 320, margin: 1 }).then(setQr).catch(() => {});
@@ -245,7 +254,7 @@ export function HostPage() {
         <span className="stat">nodes<b>{nodes.length}</b></span>
         <span className="stat">compiled tools<b>{registry.list().filter((t) => t.origin === 'compiled').length}</b></span>
         <span className="stat">hot reloads<b>{hotReloads}</b></span>
-        <span className="stat">peer transfers<b>{((hubRef.current?.blobs.bytesReceived ?? 0) / 1024).toFixed(0)} KB</b></span>
+        <span className="stat">peer transfers<b>{((hub.blobs.bytesReceived) / 1024).toFixed(0)} KB</b></span>
         <span className="stat stat-zero">raw file bytes to any cloud<b>0 B</b></span>
       </div>
 
@@ -312,7 +321,7 @@ export function HostPage() {
                       <button
                         key={t.name}
                         style={{ padding: '4px 8px', fontSize: 12 }}
-                        onClick={() => run(`${t.name} @ ${n.label}`, () => t.fn(hubRef.current!, n))}
+                        onClick={() => run(`${t.name} @ ${n.label}`, () => t.fn(hub, n))}
                       >
                         {t.name}
                       </button>

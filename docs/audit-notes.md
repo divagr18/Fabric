@@ -15,10 +15,9 @@ All 10 top-severity items were fixed the same hour; the rest are catalogued belo
 9. **Blob failure before a waiter registered lost the diagnosis** (60s generic timeout instead) → failures are stored symmetrically with successes.
 10. **Tool results containing raw bytes exploded into multi-MB JSON** → Uint8Array serializes as `<binary: N bytes, kept on-device>`.
 
-## Known, deliberately deferred (post-deadline backlog)
-- blob_begin `size` not validated against received bytes (corrupt-sender edge)
-- single-slot approval UI (concurrent approvals would queue-jump)
-- `void` DO storage writes don't surface rare put() failures
-- React StrictMode double-registers listeners on memoized emitters (dev-only double logs)
-- concurrent first-use CLIP model loads race (both succeed; wasted download)
-- embed_text→embed aliasing encoded in 4 places; base64 (not binary) DataChannel framing; no per-file vector cache; sequential replans in sweep
+## Second pass (same day): 12 of the 14 deferred items fixed
+- blob size-mismatch validation + BlobReceiver unit suite (5/5) · approval FIFO queue · DO storage errors logged · planner non-JSON guard · store-after-register (no orphaned persisted tools) · memoized model loads · provenance whitelist · centralized embed_text alias (`capabilityMethodFor`) · bounded node log · `getGraph` derived from `views()` · concurrent replans · per-file vector cache (`cached` count in embed results) · unsubscribe-based listeners + idempotent start/stop (StrictMode/HMR-safe lifecycle)
+
+## Deliberately not fixed (with reasons)
+- **base64-over-DataChannel framing** — a proper fix is a binary subprotocol across DataChannel, the WS relay, and the DO router; high risk, no benefit at demo file sizes. Post-hackathon.
+- **`delete_tool` sent while the socket is down** — `Signaling` queues sends until reconnect within a session; the only loss window is closing the host immediately after a revoke, and the consequence is a tool restoring as `degraded` (one click to re-revoke). Accepted.

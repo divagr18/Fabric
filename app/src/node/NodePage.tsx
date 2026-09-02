@@ -63,16 +63,18 @@ export function NodePage({ roomCode }: { roomCode: string }) {
   }, [roomCode]);
 
   useEffect(() => {
-    agent.on('log', addLine);
-    agent.on('status', setStatus);
-    agent.on('kind', setKind);
-    store.onChange(() => {
-      agent.advertise();
-      bump((n) => n + 1);
-      // Pre-warm the embedding model at consent time, not mid-agent-call —
-      // the download happens while the user is still setting up.
-      void embedder.warmup().catch(() => { /* surfaced via status */ });
-    });
+    const unsubs = [
+      agent.on('log', addLine),
+      agent.on('status', setStatus),
+      agent.on('kind', setKind),
+      store.onChange(() => {
+        agent.advertise();
+        bump((n) => n + 1);
+        // Pre-warm the embedding model at consent time, not mid-agent-call —
+        // the download happens while the user is still setting up.
+        void embedder.warmup().catch(() => { /* surfaced via status */ });
+      }),
+    ];
     embedder.onStatus = (s) => {
       setEmbedStatus(s);
       if (s.state === 'ready') agent.advertise(); // backend name is now honest
@@ -96,6 +98,7 @@ export function NodePage({ roomCode }: { roomCode: string }) {
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       void lock?.release?.();
+      unsubs.forEach((u) => u());
       agent.stop();
     };
   }, [agent, store, embedder, human]);
