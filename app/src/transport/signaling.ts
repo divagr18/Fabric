@@ -43,6 +43,10 @@ export class Signaling {
     };
     ws.onclose = (ev) => {
       if (this.closedByUs || ev.code === 4000 /* replaced by our own reconnect */) return;
+      if (ev.code === 4001) { // evicted by a newer host — do NOT fight back
+        this.onStatus('closed');
+        return;
+      }
       this.scheduleReconnect();
     };
     ws.onerror = () => { /* onclose follows */ };

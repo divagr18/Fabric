@@ -24,7 +24,19 @@ interface Envelope {
 }
 
 export class RoomDO implements DurableObject {
-  constructor(private state: DurableObjectState) {}
+  /** The one authoritative host peer. Stale host sockets (evicted but whose
+   *  close never completed) are ignored everywhere rather than trusted. */
+  private hostPeer: string | null = null;
+
+  constructor(private state: DurableObjectState) {
+    void state.blockConcurrencyWhile(async () => {
+      this.hostPeer = (await state.storage.get<string>('hostPeer')) ?? null;
+    });
+  }
+
+  private isStaleHost(m: PeerMeta | null): boolean {
+    return !!m && m.role === 'host' && m.peerId !== this.hostPeer;
+  }
 
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get('Upgrade') !== 'websocket') {
@@ -35,14 +47,19 @@ export class RoomDO implements DurableObject {
     const role = url.searchParams.get('role') === 'host' ? 'host' : 'node';
     const label = (url.searchParams.get('label') ?? 'device').slice(0, 40);
 
-    // One host per room: role is client-claimed, so without this, anyone with the
-    // room code could claim host and write/erase the fabric's persisted tools.
+    // One live host per room (tool storage is host-gated). A new host connection
+    // EVICTS any lingering host socket rather than being rejected — rejection
+    // deadlocks legitimate reloads/new tabs against zombie sockets from
+    // non-graceful closes. Last host wins; the room code is the trust boundary.
     if (role === 'host') {
-      const rival = this.state.getWebSockets().find((ws) => {
+      this.hostPeer = peerId;
+      await this.state.storage.put('hostPeer', peerId);
+      for (const ws of this.state.getWebSockets()) {
         const m = this.meta(ws);
-        return m?.role === 'host' && m.peerId !== peerId;
-      });
-      if (rival) return new Response('room already has a host', { status: 409 });
+        if (m?.role === 'host' && m.peerId !== peerId) {
+          try { ws.close(4001, 'replaced by a newer host'); } catch { /* already gone */ }
+        }
+      }
     }
 
     // One connection per peerId: close any stale socket for the same peer (reconnects).
@@ -85,7 +102,7 @@ export class RoomDO implements DurableObject {
   private roster(): PeerMeta[] {
     return this.state.getWebSockets()
       .map((ws) => this.meta(ws))
-      .filter((m): m is PeerMeta => m !== null);
+      .filter((m): m is PeerMeta => m !== null && !this.isStaleHost(m));
   }
 
   private send(ws: WebSocket, data: string) {
@@ -111,12 +128,12 @@ export class RoomDO implements DurableObject {
     if (!env || env.v !== 1 || typeof env.to !== 'string') return;
 
     const sender = this.meta(ws);
-    if (!sender) return;
+    if (!sender || this.isStaleHost(sender)) return; // evicted hosts are inert
     env.from = sender.peerId; // never trust client-claimed identity
 
     // Persistence messages are consumed by the actor, never routed. Host-only.
     if (env.type === 'store_tool' || env.type === 'delete_tool') {
-      if (sender.role !== 'host') return;
+      if (sender.role !== 'host' || sender.peerId !== this.hostPeer) return;
       void this.handleToolStorage(env);
       return;
     }
@@ -124,13 +141,13 @@ export class RoomDO implements DurableObject {
     const data = JSON.stringify(env);
     if (env.to === 'room') {
       for (const peer of this.state.getWebSockets()) {
-        if (peer !== ws) this.send(peer, data);
+        if (peer !== ws && !this.isStaleHost(this.meta(peer))) this.send(peer, data);
       }
       return;
     }
     for (const peer of this.state.getWebSockets()) {
       const m = this.meta(peer);
-      if (!m) continue;
+      if (!m || this.isStaleHost(m)) continue;
       if (m.peerId === env.to || (env.to === 'host' && m.role === 'host')) {
         this.send(peer, data);
       }
