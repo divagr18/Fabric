@@ -30,7 +30,7 @@ export function SurfacePanel({ registry }: { registry: WebMcpRegistry }) {
       <p className="dim" style={{ margin: '10px 0 4px' }}>COMPILED</p>
       {compiled.length === 0 && <p className="dim" style={{ margin: 0 }}>none yet — the agent compiles these at runtime</p>}
       {compiled.map((t) => (
-        <p key={t.def.name} style={{ margin: '2px 0', display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center' }}>
+        <p key={t.def.name} className="tool-row" style={{ margin: '2px 0', display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center' }}>
           <span>⚡ <code>{t.def.name}</code>{' '}
             <span className="badge" title={`${t.pipeline?.stages.length ?? '?'} stages`}>
               v{t.version} · {t.pipeline?.stages.length ?? '?'}st

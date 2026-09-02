@@ -93,6 +93,10 @@ export function NodePage({ roomCode }: { roomCode: string }) {
     };
   }, [agent, store, embedder, human]);
 
+  useEffect(() => {
+    document.title = `Fabric · node ${roomCode}`;
+  }, [roomCode]);
+
   const grants = store.list();
 
   return (

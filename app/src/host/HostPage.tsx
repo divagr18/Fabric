@@ -29,7 +29,7 @@ export function HostPage() {
   const [qr, setQr] = useState<string>('');
   const [approval, setApproval] = useState<{ what: string; resolve: (ok: boolean) => void } | null>(null);
   const [hotReloads, setHotReloads] = useState(0);
-  const [stages, setStages] = useState<Array<{ id: string; method: string; node: string; status: string }>>([]);
+  const [stages, setStages] = useState<Array<{ id: string; method: string; node: string; status: string; startedAt: number; ms?: number }>>([]);
   const [banner, setBanner] = useState<Banner | null>(null);
   const [preview, setPreview] = useState<{ url: string; name: string; score?: number } | null>(null);
   const [artifact, setArtifact] = useState<{ url: string; name: string } | null>(null);
@@ -72,8 +72,13 @@ export function HostPage() {
       onStage: (stage, status, detail) => {
         addLine(`stage ${stage.id} [${stage.method} @ ${stage.node === 'host' ? 'host' : stage.node}] ${status}${detail ? ` — ${detail}` : ''}`);
         setStages((prev) => {
+          const existing = prev.find((s) => s.id === stage.id);
           const next = prev.filter((s) => s.id !== stage.id);
-          next.push({ id: stage.id, method: stage.method, node: stage.node, status });
+          const startedAt = existing?.startedAt ?? performance.now();
+          next.push({
+            id: stage.id, method: stage.method, node: stage.node, status, startedAt,
+            ms: status === 'done' || status === 'failed' ? Math.round(performance.now() - startedAt) : undefined,
+          });
           return next.slice(-12);
         });
       },
@@ -107,6 +112,11 @@ export function HostPage() {
   useEffect(() => {
     QRCode.toDataURL(joinUrl, { width: 320, margin: 1 }).then(setQr).catch(() => {});
   }, [joinUrl]);
+
+  useEffect(() => {
+    const compiled = registry.list().filter((t) => t.origin === 'compiled').length;
+    document.title = `Fabric · ${nodes.length} node${nodes.length === 1 ? '' : 's'}${compiled > 0 ? ` · ⚡${compiled}` : ''}`;
+  }, [nodes, hotReloads, registry]);
 
   const log = (l: string) => setLines((prev) => [...prev.slice(-199), stamp(l)]);
 
@@ -217,6 +227,11 @@ export function HostPage() {
         {registry.list().filter((t) => t.origin === 'compiled').map((t) => (
           <span key={t.def.name} className="knot knot-spark" title={`⚡ ${t.def.name} v${t.version}`} />
         ))}
+        {(nodes.length > 0 || registry.list().some((t) => t.origin === 'compiled')) && (
+          <span className="weave-label" style={{ marginLeft: 'auto' }}>
+            {nodes.length} device{nodes.length === 1 ? '' : 's'} · {registry.list().filter((t) => t.origin === 'compiled').length} compiled tool{registry.list().filter((t) => t.origin === 'compiled').length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
 
       <div className="stats">
@@ -233,7 +248,13 @@ export function HostPage() {
             <h2>Join this fabric</h2>
             <p className="roomcode">{roomCode}</p>
             {qr && <img className="qr" src={qr} alt={`QR code for ${joinUrl}`} />}
-            <p style={{ fontSize: 12 }}><code>{joinUrl}</code></p>
+            <p style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <code style={{ minWidth: 0 }}>{joinUrl}</code>
+              <button
+                style={{ padding: '3px 10px', fontSize: 11, flex: 'none' }}
+                onClick={() => { void navigator.clipboard.writeText(joinUrl); log('join link copied'); }}
+              >copy</button>
+            </p>
             <p className="dim" style={{ marginBottom: 0 }}>Scan with a phone, or open in a new tab — every browser becomes a node.</p>
           </div>
           <div className="panel">
@@ -256,7 +277,7 @@ export function HostPage() {
             {nodes.length === 0 && <p className="dim">none yet — waiting for devices</p>}
             <div className="nodes-grid">
               {nodes.map((n) => (
-                <div key={n.peerId} className={`node-card${n.alive ? '' : ' stale'}`}>
+                <div key={n.peerId} className={`node-card${n.alive ? '' : ' stale'}${stages.some((s) => s.status === 'running' && s.node === n.peerId) ? ' busy' : ''}`}>
                   <strong>{n.label}</strong>
                   <span>
                     <span className={`badge ${n.kind}`}>{n.kind}</span>{' '}
@@ -302,7 +323,7 @@ export function HostPage() {
                   {i > 0 && <span className="flow-arrow">→</span>}
                   <span className={`flow-stage fs-${s.status}${s.status === 'running' ? ' pulse' : ''}`}>
                     <b>{s.method}</b>
-                    <small>@ {s.node === 'host' ? 'host' : (nodes.find((n) => n.peerId === s.node)?.label ?? s.node)}</small>
+                    <small>@ {s.node === 'host' ? 'host' : (nodes.find((n) => n.peerId === s.node)?.label ?? s.node)}{s.ms != null && ` · ${s.ms >= 1000 ? `${(s.ms / 1000).toFixed(1)}s` : `${s.ms}ms`}`}</small>
                   </span>
                 </span>
               ))}
