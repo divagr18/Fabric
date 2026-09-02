@@ -26,6 +26,17 @@ Fabric is not a site that *added* WebMCP tools — the mutable WebMCP surface **
 
 ## How WebMCP is implemented (where to look)
 
+Every tool — core and runtime-compiled — goes through the standard registration call in `app/src/webmcp/registry.ts`:
+
+```js
+document.modelContext.registerTool({
+  name: pipeline.toolName,          // e.g. "find_matching_photos" — chosen by the agent
+  description: pipeline.description,
+  inputSchema: pipeline.inputSchema,
+  execute: async (input) => { /* run the compiled cross-device pipeline */ },
+}, { signal: controller.signal });   // abort = revoke; re-register same name = hot reload
+```
+
 Every `document.modelContext` call lives in **`app/src/webmcp/`**:
 
 | What | Where |

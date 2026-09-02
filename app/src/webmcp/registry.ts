@@ -89,6 +89,8 @@ export class WebMcpRegistry {
     existing?.controller.abort(); // hot-swap path: unregister the old implementation first
 
     const controller = new AbortController();
+    // Platform call (mc === document.modelContext where available):
+    //   document.modelContext.registerTool({ name, description, inputSchema, execute }, { signal })
     await mc.registerTool(
       {
         name: def.name,
