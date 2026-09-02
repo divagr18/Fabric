@@ -37,6 +37,9 @@ export function installCoreSurface(
   let manager: HotReloadManager;
 
   const registerCompiled = async (pipeline: Pipeline, goal: string) => {
+    // Persist in the room's Durable Object so the fabric outlives its devices
+    // (covers fresh compiles AND hot-swapped plans — hot reload re-enters here).
+    hub.storeTool({ goal, pipeline });
     await registry.register(
       {
         name: pipeline.toolName,
@@ -72,19 +75,43 @@ export function installCoreSurface(
     );
   };
 
-  const degrade = async (tool: RegisteredTool, reason: string) => {
+  const registerDegraded = async (pipeline: Pipeline, goal: string | undefined, reason: string) => {
     await registry.register(
       {
-        name: tool.def.name,
-        description: tool.def.description,
-        inputSchema: tool.def.inputSchema,
+        name: pipeline.toolName,
+        description: pipeline.description,
+        inputSchema: pipeline.inputSchema,
         execute: async () => { throw new Error(reason); },
       },
       'compiled',
-      tool.pipeline,
-      tool.goal,
+      pipeline,
+      goal,
     );
+    registry.setHealth(pipeline.toolName, 'degraded');
   };
+
+  const degrade = async (tool: RegisteredTool, reason: string) => {
+    if (tool.pipeline) await registerDegraded(tool.pipeline, tool.goal, reason);
+  };
+
+  // Restoration: tools persisted in the room's Durable Object come back on host
+  // join as degraded placeholders; the hot-reload heal loop replans them onto
+  // whatever devices join. Reload the page — the fabric remembers.
+  hub.on('storedTools', (tools) => {
+    void (async () => {
+      let restored = 0;
+      for (const t of tools) {
+        const pipeline = t.pipeline as Pipeline;
+        if (!pipeline?.toolName || registry.get(pipeline.toolName)) continue;
+        try {
+          await registerDegraded(pipeline, t.goal,
+            `"${pipeline.toolName}" was restored from this fabric's previous session and is waiting for devices with the needed capabilities to rejoin`);
+          restored += 1;
+        } catch { /* WebMCP unavailable in this browser — panel explains */ }
+      }
+      if (restored > 0) log(`⟲ restored ${restored} compiled tool(s) from this fabric's storage — they heal as devices rejoin`);
+    })();
+  });
 
   manager = new HotReloadManager({
     hub,

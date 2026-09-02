@@ -42,13 +42,15 @@ export function HostPage() {
     hub.on('log', addLine);
     hub.on('nodes', setNodes);
     hub.on('status', setStatus);
-    hub.start();
     registry.on((e) => {
       if (e.type === 'registered' && e.origin === 'compiled') addLine(`⚡ + ${e.name} REGISTERED via WebMCP`);
       else if (e.type === 'swapped') {
         addLine(`🔥 ${e.name} hot-swapped → v${e.version}`);
         setHotReloads((n) => n + 1);
-      } else if (e.type === 'revoked') addLine(`− ${e.name} revoked`);
+      } else if (e.type === 'revoked') {
+        addLine(`− ${e.name} revoked`);
+        hub.deleteTool(e.name); // remove from the fabric's persistent storage too
+      }
     });
     installCoreSurface(registry, hub, {
       onLog: addLine,
@@ -72,6 +74,9 @@ export function HostPage() {
         link.click();
       },
     });
+    // Start AFTER the surface attaches its listeners — stored_tools arrives
+    // moments after the socket opens.
+    hub.start();
     return () => hub.stop();
   }, [roomCode, registry]);
 
@@ -212,6 +217,7 @@ export function HostPage() {
               <li>Ask: <em>"Call inspect_fabric — what can this fabric do?"</em></li>
               <li>Then: <em>"Compile a tool that finds photos across my devices by description — find the dog."</em> Watch the tool appear mid-session and rank the dog first.</li>
               <li>Close the node tab, call it again — it <strong>hot-reloads</strong> under the same name. That's the point.</li>
+              <li>Reload <em>this</em> page — your compiled tools come back and heal as devices rejoin. The fabric is a <strong>Durable Object</strong>; it outlives its devices.</li>
             </ol>
             <p className="dim" style={{ marginBottom: 0, fontSize: 12 }}>Every capability is explicitly shared. Raw files never touch a server — execution goes to the data.</p>
           </div>

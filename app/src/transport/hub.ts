@@ -1,4 +1,4 @@
-import { Capability, Envelope, PeerId, PeerMeta } from './protocol';
+import { Capability, Envelope, PeerId, PeerMeta, StoredTool, makeEnvelope } from './protocol';
 import { PeerLink, ChannelKind } from './channel';
 import { BlobReceiver } from './blob';
 import { RtcSession } from './rtc';
@@ -54,6 +54,7 @@ type HubEvents = {
   status: (s: SignalingStatus) => void;
   nodeLost: (peerId: PeerId, label: string) => void;
   graphChanged: (change: GraphChange) => void;
+  storedTools: (tools: StoredTool[]) => void;
 };
 
 /** Host-side hub: node registry, RTC answering, heartbeats, RPC with correlation. */
@@ -64,7 +65,7 @@ export class Hub {
   readonly blobs = new BlobReceiver();
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private listeners: { [K in keyof HubEvents]: HubEvents[K][] } = {
-    log: [], nodes: [], status: [], nodeLost: [], graphChanged: [],
+    log: [], nodes: [], status: [], nodeLost: [], graphChanged: [], storedTools: [],
   };
 
   constructor(public roomCode: string, private selfId: PeerId, label: string) {
@@ -129,11 +130,23 @@ export class Hub {
     };
   }
 
+  /** Persist a compiled tool in the room's Durable Object (the fabric outlives its devices). */
+  storeTool(tool: StoredTool) {
+    this.signaling.send(makeEnvelope(this.selfId, 'room', { type: 'store_tool', payload: { tool } }));
+  }
+
+  deleteTool(name: string) {
+    this.signaling.send(makeEnvelope(this.selfId, 'room', { type: 'delete_tool', payload: { name } }));
+  }
+
   private handle(env: Envelope) {
     if (this.blobs.handle(env)) return;
     switch (env.type) {
       case 'roster':
         this.syncRoster(env.payload.peers);
+        return;
+      case 'stored_tools':
+        this.emit('storedTools', env.payload.tools);
         return;
       case 'signal': {
         const entry = env.from !== 'room' ? this.nodes.get(env.from) : undefined;

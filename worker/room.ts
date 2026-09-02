@@ -47,6 +47,23 @@ export class RoomDO implements DurableObject {
     const server = pair[1];
     this.state.acceptWebSocket(server, [peerId, role]);
     server.serializeAttachment({ peerId, role, label, joinedAt: Date.now() } satisfies PeerMeta);
+
+    // The fabric outlives its devices: a joining host receives every compiled
+    // tool persisted in this room's storage.
+    if (role === 'host') {
+      const stored = await this.state.storage.list({ prefix: 'tool:' });
+      if (stored.size > 0) {
+        this.send(server, JSON.stringify({
+          v: 1,
+          id: crypto.randomUUID(),
+          from: 'room',
+          to: peerId,
+          type: 'stored_tools',
+          payload: { tools: [...stored.values()] },
+        } satisfies Envelope));
+      }
+    }
+
     this.broadcastRoster();
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
@@ -87,6 +104,13 @@ export class RoomDO implements DurableObject {
     if (!sender) return;
     env.from = sender.peerId; // never trust client-claimed identity
 
+    // Persistence messages are consumed by the actor, never routed. Host-only.
+    if (env.type === 'store_tool' || env.type === 'delete_tool') {
+      if (sender.role !== 'host') return;
+      void this.handleToolStorage(env);
+      return;
+    }
+
     const data = JSON.stringify(env);
     if (env.to === 'room') {
       for (const peer of this.state.getWebSockets()) {
@@ -101,6 +125,22 @@ export class RoomDO implements DurableObject {
         this.send(peer, data);
       }
     }
+  }
+
+  private async handleToolStorage(env: Envelope) {
+    if (env.type === 'delete_tool') {
+      const { name } = env.payload as { name?: unknown };
+      if (typeof name === 'string' && name.length <= 64) {
+        await this.state.storage.delete(`tool:${name}`);
+      }
+      return;
+    }
+    const { tool } = env.payload as { tool?: { goal?: unknown; pipeline?: { toolName?: unknown } } };
+    const name = tool?.pipeline?.toolName;
+    if (typeof name !== 'string' || !/^[a-z][a-z0-9_]{2,40}$/.test(name) || typeof tool?.goal !== 'string') return;
+    const existing = await this.state.storage.list({ prefix: 'tool:' });
+    if (!existing.has(`tool:${name}`) && existing.size >= 20) return; // cap per room
+    await this.state.storage.put(`tool:${name}`, tool);
   }
 
   webSocketClose(_ws: WebSocket) {

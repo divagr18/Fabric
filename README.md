@@ -109,7 +109,7 @@ A fabric isn't a row in a database — it's an **addressable actor at the edge**
 - **A standing runtime that costs nothing while idle.** WebSocket Hibernation evicts the compute while keeping every device's socket open — a personal fabric can sit parked at the edge indefinitely for ~free. That's the deployment story, not a demo constraint.
 - **Locality.** The object instantiates near the first device that joins — the coordination point for your living room lives at the edge near your living room.
 
-It also points at the next step: an actor with storage can **outlive its devices**. Persisting compiled tool definitions in the object — so your fabric still remembers what the agent built when you rejoin tomorrow — is a `storage.put` away (roadmap, not shipped).
+And because an actor has storage, **the fabric outlives its devices**: compiled tools persist inside the object itself. Reload the host — or come back tomorrow to the same room — and the tools the agent built are restored, held as `degraded` until devices with the needed capabilities rejoin, then automatically replanned back to life by the hot-reload loop. The devices are ephemeral; the fabric is not.
 
 ## Run it
 

@@ -18,8 +18,17 @@ export interface Capability {
   methods: string[];                // primitives this capability serves
 }
 
+/** A compiled tool persisted in the room's Durable Object — the fabric outlives its devices. */
+export interface StoredTool {
+  goal: string;
+  pipeline: unknown; // Pipeline shape; transport stays ignorant of compile internals
+}
+
 export type Message =
   | { type: 'roster'; payload: { peers: PeerMeta[] } }
+  | { type: 'store_tool'; payload: { tool: StoredTool } }
+  | { type: 'delete_tool'; payload: { name: string } }
+  | { type: 'stored_tools'; payload: { tools: StoredTool[] } }
   | { type: 'signal'; payload: { kind: 'offer'; sdp: string } | { kind: 'answer'; sdp: string } | { kind: 'ice'; candidate: RTCIceCandidateInit } }
   | { type: 'advertise_capabilities'; payload: { caps: Capability[] } }
   | { type: 'rpc_request'; payload: { method: string; args: unknown } }
