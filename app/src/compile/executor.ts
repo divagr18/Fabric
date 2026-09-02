@@ -1,3 +1,4 @@
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Hub } from '../transport/hub';
 import { rankBySimilarity } from '../capabilities/match';
 import {
@@ -195,12 +196,12 @@ function stripVector(item: Record<string, unknown>): Record<string, unknown> {
   return rest;
 }
 
-/** pdf-lib is heavy — load it only when a packet is actually compiled. */
+/** pdf-lib is bundled eagerly: a lazy chunk breaks in open tabs whenever a
+ *  redeploy replaces the hashed asset it points at. */
 async function compilePdf(
   title: string,
   parts: Array<{ name?: string; mime?: string; bytes?: Uint8Array; text?: string }>,
 ): Promise<{ name: string; mime: string; bytes: Uint8Array }> {
-  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
 
