@@ -26,7 +26,7 @@ A person and their agent assemble work from devices *and people* in the same gra
 
 ## How we built it
 
-One Cloudflare Worker (Static Assets SPA + Durable Object per room for WebSocket signaling + same-origin model proxy + planner endpoint). WebRTC DataChannel star topology with transparent relay fallback. On-device compute via transformers.js CLIP (WebGPU/fp16 on desktop, WASM/q8 on mobile) and Tesseract. The planner is GPT (server-side, structured to a typed-primitive pipeline JSON — no code generation) with a validator that rejects anything the capability graph can't serve, and a replan mode with a frozen interface for hot reload. All `document.modelContext` code lives in `app/src/webmcp/` — registration, revoke, and hot-swap in one greppable place.
+One Cloudflare Worker (Static Assets SPA + same-origin model proxy + planner endpoint), with **each fabric living as a Durable Object** — an addressable, single-threaded actor at the edge. The actor serializes every room event, which is why Fabric needs zero coordination code: roster consistency, ordered blob transfer, and the graph-change signals that drive hot reload all fall out of the object model. With WebSocket Hibernation, an idle fabric costs effectively nothing — a standing personal runtime parked at the edge, instantiated near the devices it coordinates. WebRTC DataChannel star topology with transparent relay fallback. On-device compute via transformers.js CLIP (WebGPU/fp16 on desktop, WASM/q8 on mobile) and Tesseract. The planner is GPT (server-side, structured to a typed-primitive pipeline JSON — no code generation) with a validator that rejects anything the capability graph can't serve, and a replan mode with a frozen interface for hot reload. All `document.modelContext` code lives in `app/src/webmcp/` — registration, revoke, and hot-swap in one greppable place.
 
 ## Challenges
 
@@ -38,7 +38,7 @@ ChatGPT compiled a tool that didn't exist, WebMCP registered it mid-conversation
 
 ## What's next
 
-Cross-vendor: the same fabric page serving Chrome's built-in agent alongside ChatGPT — two vendors' agents sharing one consent membrane. Session capabilities (a page exposing safe, user-approved actions from an authenticated app). Trace-driven tool suggestion (repeated primitive sequences offered as compiled tools).
+Fabrics that outlive their devices: the room is already a Durable Object with storage, so persisting compiled tools in the actor — rejoin tomorrow and your fabric still remembers what the agent built for it — is the natural next step. Cross-vendor: the same fabric page serving Chrome's built-in agent alongside ChatGPT — two vendors' agents sharing one consent membrane. Trace-driven tool suggestion (repeated primitive sequences offered as compiled tools).
 
 ---
 

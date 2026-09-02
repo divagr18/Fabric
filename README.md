@@ -99,7 +99,17 @@ PASS  replan  → same name, same schema, phone gone: [embed_text@laptop → emb
   files       files+GPU camera+files  capture / decide / approve
 ```
 
-One Cloudflare Worker serves the SPA (Static Assets), WebSocket signaling (a Durable Object per room, Hibernation API), the model proxy, and the planner endpoint.
+One Cloudflare Worker serves the SPA (Static Assets), WebSocket signaling, the model proxy, and the planner endpoint.
+
+### Why each fabric is a Durable Object
+
+A fabric isn't a row in a database — it's an **addressable actor at the edge**. `ROOM.idFromName(code)` gives every fabric a global identity as a single-threaded live object, and that buys three things outright:
+
+- **Ordering and consistency for free.** The object serializes every event — joins, losses, capability changes, relayed blob chunks. Hot reload trusts the roster and blob transfers reassemble byte-perfect because the actor model *is* the consensus; Fabric contains zero coordination code.
+- **A standing runtime that costs nothing while idle.** WebSocket Hibernation evicts the compute while keeping every device's socket open — a personal fabric can sit parked at the edge indefinitely for ~free. That's the deployment story, not a demo constraint.
+- **Locality.** The object instantiates near the first device that joins — the coordination point for your living room lives at the edge near your living room.
+
+It also points at the next step: an actor with storage can **outlive its devices**. Persisting compiled tool definitions in the object — so your fabric still remembers what the agent built when you rejoin tomorrow — is a `storage.put` away (roadmap, not shipped).
 
 ## Run it
 
