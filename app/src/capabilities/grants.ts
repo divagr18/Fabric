@@ -129,9 +129,21 @@ export class GrantStore {
     return this.grants.get(capId)?.files.find((f) => f.id === fileId);
   }
 
-  /** Data capabilities to advertise for current grants. */
+  /** Data capabilities to advertise. The ability to serve files exists even with
+   *  zero grants — an empty share list is a runtime state, not a missing
+   *  capability — so tools over documents can compile before anything is shared. */
   capabilities(): Capability[] {
-    return this.list().map((g) => ({
+    const grants = this.list();
+    if (grants.length === 0) {
+      return [{
+        id: 'data:none',
+        kind: 'data',
+        name: 'files',
+        detail: 'nothing shared yet — the user can share folders or photos',
+        methods: ['data.list', 'data.read', 'compute.embed', 'compute.ocr'],
+      }];
+    }
+    return grants.map((g) => ({
       id: g.capId,
       kind: 'data',
       name: g.name,

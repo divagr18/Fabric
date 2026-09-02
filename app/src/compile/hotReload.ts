@@ -27,6 +27,9 @@ export interface HotReloadDeps {
 
 const DEBOUNCE_MS = 2_000;
 const REPLAN_COOLDOWN_MS = 10_000;
+/** After a host (re)load, wait for nodes to reconnect and re-advertise before
+ *  any replan — otherwise restored tools churn against a half-empty graph. */
+const SETTLE_MS = 8_000;
 
 function canonical(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
@@ -42,14 +45,17 @@ export class HotReloadManager {
   private lastReplanAt = new Map<string, number>();
   private retryScheduled = new Set<string>();
   private sweeping = false;
+  private startedAt = 0;
 
   constructor(private deps: HotReloadDeps) {}
 
   start() {
+    this.startedAt = Date.now();
     this.deps.hub.on('graphChanged', (change) => {
       this.pending.push(change);
       if (this.timer) clearTimeout(this.timer);
-      this.timer = setTimeout(() => void this.sweep(), DEBOUNCE_MS);
+      const settleLeft = this.startedAt + SETTLE_MS - Date.now();
+      this.timer = setTimeout(() => void this.sweep(), Math.max(DEBOUNCE_MS, settleLeft));
     });
   }
 
