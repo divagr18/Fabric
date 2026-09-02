@@ -6,6 +6,7 @@ import { SignalingStatus } from '../transport/signaling';
 import { WebMcpRegistry } from '../webmcp/registry';
 import { Banner, installCoreSurface } from '../webmcp/surface';
 import { SurfacePanel } from '../ui/SurfacePanel';
+import { TopologyMap } from '../ui/TopologyMap';
 import { Log, stamp } from '../ui/Log';
 
 function useRoomCode(): string {
@@ -33,6 +34,7 @@ export function HostPage() {
   const [banner, setBanner] = useState<Banner | null>(null);
   const [preview, setPreview] = useState<{ url: string; name: string; score?: number } | null>(null);
   const [artifact, setArtifact] = useState<{ url: string; name: string } | null>(null);
+  const [agentCalls, setAgentCalls] = useState<Array<{ callId: string; name: string; args: string; status: 'running' | 'ok' | 'err'; ms?: number }>>([]);
   const hubRef = useRef<Hub | null>(null);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -54,6 +56,10 @@ export function HostPage() {
       } else if (e.type === 'revoked') {
         addLine(`− ${e.name} revoked`);
         hub.deleteTool(e.name); // remove from the fabric's persistent storage too
+      } else if (e.type === 'call_start') {
+        setAgentCalls((prev) => [...prev.slice(-4), { callId: e.callId, name: e.name, args: e.args, status: 'running' as const }]);
+      } else if (e.type === 'call_end') {
+        setAgentCalls((prev) => prev.map((c) => c.callId === e.callId ? { ...c, status: e.ok ? 'ok' as const : 'err' as const, ms: e.ms } : c));
       }
     });
     installCoreSurface(registry, hub, {
@@ -273,6 +279,14 @@ export function HostPage() {
 
         <div className="col">
           <div className="panel">
+            <h2>Topology</h2>
+            <TopologyMap
+              nodes={nodes}
+              busy={new Set(stages.filter((s) => s.status === 'running').map((s) => s.node))}
+              hostLabel={deviceLabel()}
+            />
+          </div>
+          <div className="panel">
             <h2>Nodes<span className="count">{nodes.length}</span></h2>
             {nodes.length === 0 && <p className="dim">none yet — waiting for devices</p>}
             <div className="nodes-grid">
@@ -281,6 +295,7 @@ export function HostPage() {
                   <strong>{n.label}</strong>
                   <span>
                     <span className={`badge ${n.kind}`}>{n.kind}</span>{' '}
+                    {n.alive && n.rtt != null && <span className="badge">{n.rtt}ms</span>}{' '}
                     {!n.alive && <span className="badge">stale</span>}
                   </span>
                   <span>
@@ -313,6 +328,20 @@ export function HostPage() {
         </div>
 
         <div className="col">
+          <div className="panel">
+            <h2>Agent</h2>
+            {agentCalls.length === 0 && <p className="dim" style={{ margin: 0 }}>WebMCP calls from the agent appear here live</p>}
+            {agentCalls.map((c) => (
+              <p key={c.callId} className="agent-row">
+                <span className="badge" style={{
+                  color: c.status === 'ok' ? 'var(--ok)' : c.status === 'err' ? 'var(--bad)' : 'var(--compute)',
+                  borderColor: c.status === 'ok' ? 'var(--ok)' : c.status === 'err' ? 'var(--bad)' : 'var(--compute)',
+                }}>{c.status === 'running' ? '…' : c.status === 'ok' ? `✓${c.ms != null ? ` ${c.ms >= 1000 ? `${(c.ms / 1000).toFixed(1)}s` : `${c.ms}ms`}` : ''}` : '✗'}</span>
+                <code>⟵ {c.name}</code>
+                <span className="agent-args">{c.args}</span>
+              </p>
+            ))}
+          </div>
           <SurfacePanel registry={registry} />
           <div className="panel">
             <h2>Execution</h2>

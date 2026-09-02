@@ -11,6 +11,7 @@ export interface NodeView {
   kind: ChannelKind;
   alive: boolean;
   lastSeen: number;
+  rtt?: number;
 }
 
 /** Snapshot of everything every node currently exposes — Phase 3's planner input. */
@@ -23,6 +24,7 @@ interface NodeEntry {
   link: PeerLink;
   caps: Capability[];
   lastSeen: number;
+  rtt?: number;
 }
 
 interface Pending {
@@ -62,6 +64,7 @@ export class Hub {
   private signaling: Signaling;
   private nodes = new Map<PeerId, NodeEntry>();
   private pending = new Map<string, Pending>();
+  private pings = new Map<string, { peerId: PeerId; at: number }>();
   readonly blobs = new BlobReceiver();
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private listeners: { [K in keyof HubEvents]: HubEvents[K][] } = {
@@ -103,6 +106,7 @@ export class Hub {
       kind: e.link.kind,
       alive: now - e.lastSeen < STALE_MS,
       lastSeen: e.lastSeen,
+      rtt: e.rtt,
     }));
   }
 
@@ -111,8 +115,11 @@ export class Hub {
   }
 
   private tick() {
+    if (this.pings.size > 50) this.pings.clear(); // drop stale unanswered pings
     for (const entry of this.nodes.values()) {
-      entry.link.send({ type: 'ping', payload: {} });
+      const id = crypto.randomUUID();
+      this.pings.set(id, { peerId: entry.meta.peerId, at: performance.now() });
+      entry.link.send({ type: 'ping', payload: {} }, id);
     }
     this.publishNodes(); // refreshes alive/kind badges
   }
@@ -193,7 +200,14 @@ export class Hub {
       }
       case 'pong': {
         const entry = env.from !== 'room' ? this.nodes.get(env.from) : undefined;
-        if (entry) entry.lastSeen = Date.now();
+        if (entry) {
+          entry.lastSeen = Date.now();
+          const sent = this.pings.get(env.id);
+          if (sent) {
+            entry.rtt = Math.max(1, Math.round(performance.now() - sent.at));
+            this.pings.delete(env.id);
+          }
+        }
         return;
       }
       default:

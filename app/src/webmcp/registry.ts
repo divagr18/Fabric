@@ -22,6 +22,8 @@ export interface RegisteredTool {
   version: number;
   goal?: string;           // original compile goal — replanning needs it
   health: 'ok' | 'degraded';
+  calls: number;
+  lastMs?: number;
 }
 
 interface ModelContext {
@@ -40,6 +42,8 @@ export type RegistryEvent =
   | { type: 'revoked'; name: string }
   | { type: 'swapped'; name: string; version: number }
   | { type: 'health'; name: string; health: 'ok' | 'degraded' }
+  | { type: 'call_start'; name: string; args: string; callId: string }
+  | { type: 'call_end'; name: string; ok: boolean; ms: number; callId: string }
   | { type: 'unavailable' };
 
 export class WebMcpRegistry {
@@ -97,8 +101,22 @@ export class WebMcpRegistry {
         description: def.description,
         inputSchema: def.inputSchema,
         execute: async (args: Record<string, unknown>) => {
-          const result = await def.execute(args ?? {});
-          return { content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }] };
+          const callId = crypto.randomUUID();
+          const t0 = performance.now();
+          const tracked = this.tools.get(def.name);
+          if (tracked) tracked.calls += 1;
+          this.emit({ type: 'call_start', name: def.name, args: JSON.stringify(args ?? {}).slice(0, 120), callId });
+          try {
+            const result = await def.execute(args ?? {});
+            const ms = Math.round(performance.now() - t0);
+            const t = this.tools.get(def.name);
+            if (t) t.lastMs = ms;
+            this.emit({ type: 'call_end', name: def.name, ok: true, ms, callId });
+            return { content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }] };
+          } catch (err) {
+            this.emit({ type: 'call_end', name: def.name, ok: false, ms: Math.round(performance.now() - t0), callId });
+            throw err;
+          }
         },
       },
       { signal: controller.signal },
@@ -106,6 +124,7 @@ export class WebMcpRegistry {
     this.tools.set(def.name, {
       def, controller, origin, pipeline, version,
       goal: goal ?? existing?.goal, health: 'ok',
+      calls: existing?.calls ?? 0, lastMs: existing?.lastMs,
     });
     this.emit(version > 1 ? { type: 'swapped', name: def.name, version } : { type: 'registered', name: def.name, origin, version });
   }

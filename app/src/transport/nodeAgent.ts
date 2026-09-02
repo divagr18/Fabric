@@ -91,7 +91,7 @@ export class NodeAgent {
         void this.link.rtc?.handleSignal(env.payload);
         return;
       case 'ping':
-        this.link.send({ type: 'pong', payload: {} });
+        this.link.send({ type: 'pong', payload: {} }, env.id); // echo id so the host can measure RTT
         return;
       case 'rpc_request':
         void this.dispatch(env);
