@@ -84,8 +84,7 @@ export class Executor {
   }
 
   private async runNodeStage(stage: Stage, args: Record<string, unknown>): Promise<unknown> {
-    const method = stage.method === 'compute.embed_text' ? 'compute.embed_text' : stage.method;
-    const result = await this.hub.rpc(stage.node, method, args) as Record<string, unknown> | null;
+    const result = await this.hub.rpc(stage.node, stage.method, args) as Record<string, unknown> | null;
     // A human saying no is a failure of the stage, never a silent success.
     if (result && typeof result === 'object') {
       if (result.kind === 'declined') throw new Error('the person declined the request');

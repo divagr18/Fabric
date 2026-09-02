@@ -17,6 +17,8 @@ interface PendingCall {
 export class Embedder {
   private worker: Worker | null = null;
   private pending = new Map<string, PendingCall>();
+  /** fileId|size|mtime → vector; repeat searches skip re-embedding unchanged files */
+  private vectorCache = new Map<string, number[]>();
   status: EmbedStatus = { state: 'idle' };
   onStatus: (s: EmbedStatus) => void = () => {};
 
@@ -68,7 +70,7 @@ export class Embedder {
   }
 
   /** compute.embed handler: embeds granted images by fileId (or all images in a capId). */
-  async embed(store: GrantStore, args: unknown): Promise<{ items: { fileId: string; name: string; vector: number[] }[]; skipped?: string[]; backend: string; ms: number }> {
+  async embed(store: GrantStore, args: unknown): Promise<{ items: { fileId: string; name: string; vector: number[] }[]; skipped?: string[]; backend: string; ms: number; cached?: number }> {
     const { capId, fileIds, limit } = args as { capId?: string; fileIds?: string[]; limit?: number };
     const looksImage = (f: { name: string; mime: string }) => isImage(f.name) || f.mime.startsWith('image/');
     let targets = fileIds?.length
@@ -82,16 +84,40 @@ export class Embedder {
     }
     await this.warmup();
     const files = await Promise.all(targets.map((t) => t.getFile()));
-    const { vectors, skipped, backend, ms } = (await this.call('embedImages', { files })) as {
-      vectors: Array<number[] | null>; skipped: string[]; backend: string; ms: number;
-    };
+    const keys = targets.map((t, i) => `${t.id}|${files[i].size}|${files[i].lastModified}`);
+    const vectors: Array<number[] | null> = keys.map((k) => this.vectorCache.get(k) ?? null);
+    const uncachedIdx = keys.map((_, i) => i).filter((i) => vectors[i] === null);
+
+    let backend: string = this.status.state === 'ready' ? this.status.backend : 'wasm';
+    let ms = 0;
+    let skipped: string[] = [];
+    if (uncachedIdx.length > 0) {
+      const res = (await this.call('embedImages', { files: uncachedIdx.map((i) => files[i]) })) as {
+        vectors: Array<number[] | null>; skipped: string[]; backend: string; ms: number;
+      };
+      backend = res.backend;
+      ms = res.ms;
+      skipped = res.skipped;
+      res.vectors.forEach((v, j) => {
+        const i = uncachedIdx[j];
+        vectors[i] = v;
+        if (v) {
+          this.vectorCache.set(keys[i], v);
+          if (this.vectorCache.size > 500) {
+            this.vectorCache.delete(this.vectorCache.keys().next().value!);
+          }
+        }
+      });
+    }
+
     const items = targets
       .map((t, i) => ({ fileId: t.id, name: t.name, vector: vectors[i] }))
       .filter((it): it is { fileId: string; name: string; vector: number[] } => it.vector !== null);
     if (items.length === 0) {
       throw new Error(`none of the ${targets.length} shared image(s) could be decoded (unsupported format, e.g. HEIC): ${skipped.slice(0, 5).join(', ')}`);
     }
-    return { items, skipped: skipped.length ? skipped : undefined, backend, ms };
+    const cached = targets.length - uncachedIdx.length;
+    return { items, skipped: skipped.length ? skipped : undefined, backend, ms, cached: cached || undefined };
   }
 
   async embedTexts(texts: string[]): Promise<number[][]> {

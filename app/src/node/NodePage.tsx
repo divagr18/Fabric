@@ -16,6 +16,7 @@ export function NodePage({ roomCode }: { roomCode: string }) {
   const [status, setStatus] = useState<SignalingStatus>('connecting');
   const [kind, setKind] = useState<ChannelKind>('relay');
   const [lines, setLines] = useState<string[]>([]);
+  const addLine = (l: string) => setLines((prev) => [...prev.slice(-199), stamp(l)]);
   const [embedStatus, setEmbedStatus] = useState<EmbedStatus>({ state: 'idle' });
   const [, bump] = useState(0); // re-render on grant/human changes
   const photoInput = useRef<HTMLInputElement>(null);
@@ -62,7 +63,7 @@ export function NodePage({ roomCode }: { roomCode: string }) {
   }, [roomCode]);
 
   useEffect(() => {
-    agent.on('log', (l) => setLines((prev) => [...prev.slice(-199), stamp(l)]));
+    agent.on('log', addLine);
     agent.on('status', setStatus);
     agent.on('kind', setKind);
     store.onChange(() => {
@@ -121,7 +122,7 @@ export function NodePage({ roomCode }: { roomCode: string }) {
         {grants.map((g) => (
           <p key={g.capId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <span><strong>{g.name}</strong> <span className="dim">— {g.files.length} files shared</span></span>
-            <button onClick={() => { store.revoke(g.capId); setLines((p) => [...p, stamp(`stopped sharing ${g.name}`)]); }}>
+            <button onClick={() => { store.revoke(g.capId); addLine(`stopped sharing ${g.name}`); }}>
               stop sharing
             </button>
           </p>
@@ -131,7 +132,7 @@ export function NodePage({ roomCode }: { roomCode: string }) {
             <button onClick={async () => {
               try {
                 const g = await store.addFolder();
-                setLines((p) => [...p, stamp(`shared ${g.name} (${g.files.length} files)`)]);
+                addLine(`shared ${g.name} (${g.files.length} files)`);
               } catch { /* user cancelled the picker */ }
             }}>
               📁 Share a folder
@@ -141,7 +142,7 @@ export function NodePage({ roomCode }: { roomCode: string }) {
           <button onClick={async () => {
             const files = await generateSampleFiles();
             store.addFiles(files, 'sample files (generated)', 'samples');
-            setLines((p) => [...p, stamp(`shared ${files.length} generated sample files (watermarked SAMPLE)`)]);
+            addLine(`shared ${files.length} generated sample files (watermarked SAMPLE)`);
           }}>🧪 Use sample files</button>
           <input
             ref={photoInput}
@@ -152,7 +153,7 @@ export function NodePage({ roomCode }: { roomCode: string }) {
             onChange={(e) => {
               if (e.target.files?.length) {
                 const g = store.addPhotos(e.target.files);
-                setLines((p) => [...p, stamp(`shared ${g.files.length} selected photos`)]);
+                addLine(`shared ${g.files.length} selected photos`);
               }
               e.target.value = '';
             }}

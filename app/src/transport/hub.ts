@@ -124,15 +124,14 @@ export class Hub {
     this.publishNodes(); // refreshes alive/kind badges
   }
 
-  /** Current capability graph across all online nodes (planner input in Phase 3). */
+  /** Current capability graph across all nodes (planner input) — derived from the same snapshot as views(). */
   getGraph(): CapabilityGraph {
-    const now = Date.now();
     return {
-      nodes: [...this.nodes.values()].map((e) => ({
-        peerId: e.meta.peerId,
-        label: e.meta.label,
-        online: now - e.lastSeen < STALE_MS,
-        caps: e.caps,
+      nodes: this.views().map((v) => ({
+        peerId: v.peerId,
+        label: v.label,
+        online: v.alive,
+        caps: v.caps,
       })),
     };
   }

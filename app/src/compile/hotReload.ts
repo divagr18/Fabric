@@ -1,6 +1,6 @@
 import { Hub, GraphChange } from '../transport/hub';
 import { WebMcpRegistry, RegisteredTool } from '../webmcp/registry';
-import { Pipeline } from './pipeline';
+import { Pipeline, capabilityMethodFor } from './pipeline';
 import { validatePipeline } from './validate';
 
 /**
@@ -67,10 +67,7 @@ export class HotReloadManager {
       const node = graph.nodes.find((n) => n.peerId === change.peerId);
       const stillFine = node?.online && tool.pipeline.stages
         .filter((s) => s.node === change.peerId)
-        .every((s) => {
-          const m = s.method === 'compute.embed_text' ? 'compute.embed' : s.method;
-          return node.caps.some((c) => c.methods.includes(m) || c.methods.includes(s.method));
-        });
+        .every((s) => node.caps.some((c) => c.methods.includes(s.method) || c.methods.includes(capabilityMethodFor(s.method))));
       if (!stillFine) return change;
     }
     return null;
@@ -81,6 +78,7 @@ export class HotReloadManager {
     this.sweeping = true;
     const changes = this.pending.splice(0);
     try {
+      const affected: string[] = [];
       for (const tool of this.deps.registry.list()) {
         if (tool.origin !== 'compiled') continue;
         const hit = this.affectedBy(tool, changes);
@@ -90,8 +88,10 @@ export class HotReloadManager {
           : `NODE JOINED (${hit.label})`;
         this.log(`${why} → "${tool.def.name}" ${tool.health === 'degraded' ? 'may heal' : 'stale'} → replanning…`);
         this.deps.onBanner?.({ kind: 'replanning', text: `⚠ ${why} — REPLANNING "${tool.def.name}"…` });
-        await this.replanTool(tool.def.name);
+        affected.push(tool.def.name);
       }
+      // replans are independent LLM calls — run them concurrently
+      await Promise.all(affected.map((name) => this.replanTool(name)));
     } finally {
       this.sweeping = false;
       // Changes that arrived mid-sweep must not rot in the queue.
@@ -149,7 +149,7 @@ export class HotReloadManager {
 function describeMissing(pipeline: Pipeline, graph: ReturnType<Hub['getGraph']>): string {
   const needed = [...new Set(pipeline.stages.filter((s) => s.node !== 'host').map((s) => s.method))];
   const available = new Set(graph.nodes.filter((n) => n.online).flatMap((n) => n.caps.flatMap((c) => c.methods)));
-  const gone = needed.filter((m) => !available.has(m === 'compute.embed_text' ? 'compute.embed' : m) && !available.has(m));
+  const gone = needed.filter((m) => !available.has(capabilityMethodFor(m)) && !available.has(m));
   return gone.length
     ? `no connected device currently provides ${gone.join(', ')} — rejoin a device or share the capability to heal this tool`
     : 'the devices it needs are not currently reachable';

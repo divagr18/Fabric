@@ -1,6 +1,6 @@
 import { CapabilityGraph } from '../transport/hub';
 import {
-  HOST_METHODS, NODE_METHODS, Pipeline, Stage, StageMethod, collectRefs, stageDeps, topoLayers,
+  HOST_METHODS, NODE_METHODS, Pipeline, Stage, StageMethod, capabilityMethodFor, collectRefs, stageDeps, topoLayers,
 } from './pipeline';
 
 export type ValidationResult = { ok: true } | { ok: false; errors: string[] };
@@ -49,9 +49,7 @@ export function validatePipeline(
         errors.push(`${where}: node "${stage.node}" is not in the fabric (nodes: ${graph.nodes.map((n) => `${n.peerId}=${n.label}`).join(', ')})`);
       } else {
         if (!node.online) errors.push(`${where}: node "${node.label}" is offline`);
-        // embed_text rides the same model as embed — accept either advertisement
-        const serves = node.caps.some((c) => c.methods.includes(method))
-          || (method === 'compute.embed_text' && node.caps.some((c) => c.methods.includes('compute.embed')));
+        const serves = node.caps.some((c) => c.methods.includes(method) || c.methods.includes(capabilityMethodFor(method)));
         if (!serves) {
           errors.push(`${where}: node "${node.label}" does not expose ${stage.method} (it exposes: ${[...new Set(node.caps.flatMap((c) => c.methods))].join(', ') || 'nothing'})`);
         }

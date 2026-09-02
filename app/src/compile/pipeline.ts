@@ -21,6 +21,11 @@ export const NODE_METHODS: StageMethod[] = [
 ];
 export const HOST_METHODS: StageMethod[] = ['host.match', 'host.pick', 'host.compile_pdf'];
 
+/** compute.embed_text rides the same model/capability advertisement as compute.embed. */
+export function capabilityMethodFor(method: string): string {
+  return method === 'compute.embed_text' ? 'compute.embed' : method;
+}
+
 /** Reference to the tool-call input: { "$input": "query" } */
 export interface InputRef { $input: string }
 /** Reference to a prior stage's result: { "$from": "stageId", "path": "items.0.vector" } */
