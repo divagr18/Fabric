@@ -381,10 +381,16 @@ export function HostPage() {
           {artifact && (
             <div className="panel">
               <h2>Artifact</h2>
-              <object data={artifact.url} type="application/pdf" style={{ width: '100%', height: 260, borderRadius: 6 }}>
-                <p className="dim">PDF preview unavailable — downloaded as <code>{artifact.name}</code></p>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <a href={artifact.url} download={artifact.name} style={{ flex: 1, textDecoration: 'none' }}>
+                  <button style={{ width: '100%' }}>⬇ Download PDF</button>
+                </a>
+                <button style={{ flex: 1 }} onClick={() => window.open(artifact.url, '_blank')}>Open in tab</button>
+              </div>
+              <object data={artifact.url} type="application/pdf" style={{ width: '100%', height: 240, borderRadius: 6 }}>
+                <p className="dim" style={{ margin: 0 }}>Inline preview not supported in this browser — use the buttons above.</p>
               </object>
-              <p className="dim" style={{ margin: '8px 0 0', fontSize: 12 }}><code>{artifact.name}</code> — compiled on this device</p>
+              <p className="dim" style={{ margin: '8px 0 0', fontSize: 12 }}><code>{artifact.name}</code> — compiled on this device, never uploaded</p>
             </div>
           )}
         </div>
