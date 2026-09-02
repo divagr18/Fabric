@@ -101,6 +101,14 @@ export class BlobReceiver {
         this.fail(p.transferId, `missing chunks (${t.parts.size}/${p.chunks})`);
         return true;
       }
+      // Validate announced size before assembling — a mismatch must be a precise
+      // error, not a RangeError or a silently zero-padded corrupt file.
+      let total = 0;
+      for (let i = 0; i < p.chunks; i++) total += t.parts.get(i)!.length;
+      if (total !== t.size) {
+        this.fail(p.transferId, `size mismatch (received ${total} bytes, announced ${t.size})`);
+        return true;
+      }
       const bytes = new Uint8Array(t.size);
       let off = 0;
       for (let i = 0; i < p.chunks; i++) {

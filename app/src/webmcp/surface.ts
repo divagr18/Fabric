@@ -27,7 +27,13 @@ async function planOnce(body: Record<string, unknown>): Promise<Pipeline> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data = await res.json() as { pipeline?: Pipeline; error?: string; detail?: string };
+  let data: { pipeline?: Pipeline; error?: string; detail?: string };
+  try {
+    data = await res.json();
+  } catch {
+    // e.g. a Cloudflare 5xx HTML page — fail with something a human can read
+    throw new Error(`planner HTTP ${res.status} — non-JSON response`);
+  }
   if (!res.ok || !data.pipeline) {
     throw new Error(data.error ? `${data.error}${data.detail ? ` — ${data.detail}` : ''}` : `planner HTTP ${res.status}`);
   }
@@ -44,9 +50,6 @@ export function installCoreSurface(
   let manager: HotReloadManager;
 
   const registerCompiled = async (pipeline: Pipeline, goal: string) => {
-    // Persist in the room's Durable Object so the fabric outlives its devices
-    // (covers fresh compiles AND hot-swapped plans — hot reload re-enters here).
-    hub.storeTool({ goal, pipeline });
     await registry.register(
       {
         name: pipeline.toolName,
@@ -80,6 +83,10 @@ export function installCoreSurface(
       pipeline,
       goal,
     );
+    // Persist only AFTER successful registration — a failed register must not
+    // leave an orphan that restores as permanently degraded. Covers fresh
+    // compiles AND hot-swapped plans (hot reload re-enters here).
+    hub.storeTool({ goal, pipeline });
   };
 
   const registerDegraded = async (pipeline: Pipeline, goal: string | undefined, reason: string) => {

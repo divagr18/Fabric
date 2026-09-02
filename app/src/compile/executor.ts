@@ -22,6 +22,8 @@ export interface ExecutionEvents {
   onApprove?: (what: string) => Promise<boolean>;
 }
 
+const PROVENANCE_METHODS = new Set<string>(['compute.embed', 'compute.ocr', 'data.list']);
+
 function makeExecError(stage: Stage, reason: string): ExecutionError {
   const err = new Error(`stage "${stage.id}" (${stage.method} @ ${stage.node}): ${reason}`) as ExecutionError;
   err.stageId = stage.id;
@@ -94,9 +96,11 @@ export class Executor {
       const blob = await this.hub.blobs.waitFor(result.transferId);
       return { ...result, name: blob.name, mime: blob.mime, bytes: blob.bytes };
     }
-    // Provenance: tag list items with the node that produced them, so later
-    // stages (and the result preview) know where a fileId lives.
-    if (result && typeof result === 'object' && Array.isArray((result as { items?: unknown[] }).items)) {
+    // Provenance: tag per-file items with the node that produced them, so later
+    // stages (and the result preview) know where a fileId lives. Whitelisted by
+    // method — shape-sniffing arbitrary results is how tags end up on the wrong data.
+    if (PROVENANCE_METHODS.has(stage.method)
+        && result && typeof result === 'object' && Array.isArray((result as { items?: unknown[] }).items)) {
       const r = result as { items: unknown[] };
       r.items = r.items.map((it) => (it && typeof it === 'object' ? { ...it, node: stage.node } : it));
     }

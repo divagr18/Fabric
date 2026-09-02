@@ -28,7 +28,7 @@ export function HostPage() {
   const [status, setStatus] = useState<SignalingStatus>('connecting');
   const [lines, setLines] = useState<string[]>([]);
   const [qr, setQr] = useState<string>('');
-  const [approval, setApproval] = useState<{ what: string; resolve: (ok: boolean) => void } | null>(null);
+  const [approvals, setApprovals] = useState<Array<{ what: string; resolve: (ok: boolean) => void }>>([]);
   const [hotReloads, setHotReloads] = useState(0);
   const [stages, setStages] = useState<Array<{ id: string; method: string; node: string; status: string; startedAt: number; ms?: number }>>([]);
   const [banner, setBanner] = useState<Banner | null>(null);
@@ -65,7 +65,8 @@ export function HostPage() {
     installCoreSurface(registry, hub, {
       onLog: addLine,
       onApprove: (what) => new Promise<boolean>((resolve) => {
-        setApproval({ what, resolve: (ok) => { setApproval(null); resolve(ok); } });
+        // FIFO queue — a second concurrent approval must never orphan the first
+        setApprovals((prev) => [...prev, { what, resolve: (ok) => { setApprovals((q) => q.slice(1)); resolve(ok); } }]);
       }),
       onBanner: (b) => {
         if (bannerTimer.current) clearTimeout(bannerTimer.current);
@@ -380,17 +381,17 @@ export function HostPage() {
         </div>
       </div>
 
-      {approval && (
+      {approvals.length > 0 && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(1,4,9,0.9)', zIndex: 100,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
         }}>
-          <div className="panel" style={{ maxWidth: 420, width: '100%' }}>
-            <h2 style={{ marginTop: 0 }}>Approval needed</h2>
-            <p style={{ fontSize: 16 }}>{approval.what}</p>
+          <div className="panel human-card" style={{ maxWidth: 420, width: '100%' }}>
+            <h2>Approval needed{approvals.length > 1 ? ` (1 of ${approvals.length})` : ''}</h2>
+            <p style={{ fontSize: 16 }}>{approvals[0].what}</p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button style={{ flex: 1 }} onClick={() => approval.resolve(true)}>✓ Approve</button>
-              <button style={{ flex: 1 }} onClick={() => approval.resolve(false)}>✗ Deny</button>
+              <button style={{ flex: 1 }} onClick={() => approvals[0].resolve(true)}>✓ Approve</button>
+              <button style={{ flex: 1 }} onClick={() => approvals[0].resolve(false)}>✗ Deny</button>
             </div>
           </div>
         </div>

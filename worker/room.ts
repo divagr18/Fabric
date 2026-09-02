@@ -138,6 +138,15 @@ export class RoomDO implements DurableObject {
   }
 
   private async handleToolStorage(env: Envelope) {
+    try {
+      await this.applyToolStorage(env);
+    } catch (err) {
+      // surfaced via `wrangler tail` (observability enabled) — never silent
+      console.error('[room] tool storage failed', err);
+    }
+  }
+
+  private async applyToolStorage(env: Envelope) {
     if (env.type === 'delete_tool') {
       const { name } = env.payload as { name?: unknown };
       if (typeof name === 'string' && name.length <= 64) {

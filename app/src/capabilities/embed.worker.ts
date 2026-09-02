@@ -73,31 +73,48 @@ function attempts(): Array<{ device: Backend; dtype: 'fp16' | 'q8' }> {
     : [{ device: 'wasm', dtype: 'q8' }];
 }
 
-async function loadVision(): Promise<void> {
-  if (vision) return;
-  processor = await AutoProcessor.from_pretrained(MODEL, { progress_callback });
-  let lastErr: unknown = null;
-  for (const attempt of attempts()) {
-    try {
-      vision = await CLIPVisionModelWithProjection.from_pretrained(MODEL, {
-        device: attempt.device,
-        dtype: attempt.dtype,
-        progress_callback,
-      });
-      backend = attempt.device;
-      return;
-    } catch (err) {
-      lastErr = err;
-      vision = null;
-    }
+let visionPromise: Promise<void> | null = null;
+function loadVision(): Promise<void> {
+  // memoize the in-flight load — concurrent embed calls must share one download
+  if (!visionPromise) {
+    visionPromise = (async () => {
+      processor = await AutoProcessor.from_pretrained(MODEL, { progress_callback });
+      let lastErr: unknown = null;
+      for (const attempt of attempts()) {
+        try {
+          vision = await CLIPVisionModelWithProjection.from_pretrained(MODEL, {
+            device: attempt.device,
+            dtype: attempt.dtype,
+            progress_callback,
+          });
+          backend = attempt.device;
+          return;
+        } catch (err) {
+          lastErr = err;
+          vision = null;
+        }
+      }
+      throw lastErr instanceof Error ? lastErr : new Error('no embedding backend available');
+    })().catch((err) => {
+      visionPromise = null; // allow retry after a failure
+      throw err;
+    });
   }
-  throw lastErr instanceof Error ? lastErr : new Error('no embedding backend available');
+  return visionPromise;
 }
 
-async function loadText(): Promise<void> {
-  if (text) return;
-  tokenizer = await AutoTokenizer.from_pretrained(MODEL);
-  text = await CLIPTextModelWithProjection.from_pretrained(MODEL, { dtype: 'q8', progress_callback });
+let textPromise: Promise<void> | null = null;
+function loadText(): Promise<void> {
+  if (!textPromise) {
+    textPromise = (async () => {
+      tokenizer = await AutoTokenizer.from_pretrained(MODEL);
+      text = await CLIPTextModelWithProjection.from_pretrained(MODEL, { dtype: 'q8', progress_callback });
+    })().catch((err) => {
+      textPromise = null;
+      throw err;
+    });
+  }
+  return textPromise;
 }
 
 async function embedImages(files: File[]): Promise<{ vectors: Array<number[] | null>; skipped: string[] }> {
