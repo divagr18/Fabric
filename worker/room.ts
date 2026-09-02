@@ -99,8 +99,9 @@ export class RoomDO implements DurableObject {
     try { return ws.deserializeAttachment() as PeerMeta; } catch { return null; }
   }
 
-  private roster(): PeerMeta[] {
+  private roster(exclude?: WebSocket): PeerMeta[] {
     return this.state.getWebSockets()
+      .filter((ws) => ws !== exclude) // a closing socket is still listed here
       .map((ws) => this.meta(ws))
       .filter((m): m is PeerMeta => m !== null && !this.isStaleHost(m));
   }
@@ -109,16 +110,18 @@ export class RoomDO implements DurableObject {
     try { ws.send(data); } catch { /* closing socket; roster broadcast will follow */ }
   }
 
-  private broadcastRoster() {
+  private broadcastRoster(exclude?: WebSocket) {
     const msg = JSON.stringify({
       v: 1,
       id: crypto.randomUUID(),
       from: 'room',
       to: 'room',
       type: 'roster',
-      payload: { peers: this.roster() },
+      payload: { peers: this.roster(exclude) },
     } satisfies Envelope);
-    for (const ws of this.state.getWebSockets()) this.send(ws, msg);
+    for (const ws of this.state.getWebSockets()) {
+      if (ws !== exclude) this.send(ws, msg);
+    }
   }
 
   webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
@@ -179,11 +182,11 @@ export class RoomDO implements DurableObject {
     await this.state.storage.put(`tool:${name}`, tool);
   }
 
-  webSocketClose(_ws: WebSocket) {
-    this.broadcastRoster();
+  webSocketClose(ws: WebSocket) {
+    this.broadcastRoster(ws);
   }
 
-  webSocketError(_ws: WebSocket) {
-    this.broadcastRoster();
+  webSocketError(ws: WebSocket) {
+    this.broadcastRoster(ws);
   }
 }

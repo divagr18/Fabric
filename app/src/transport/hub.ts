@@ -25,6 +25,7 @@ interface NodeEntry {
   caps: Capability[];
   lastSeen: number;
   rtt?: number;
+  wasAlive: boolean;
 }
 
 interface Pending {
@@ -135,10 +136,26 @@ export class Hub {
 
   private tick() {
     if (this.pings.size > 50) this.pings.clear(); // drop stale unanswered pings
+    const now = Date.now();
     for (const entry of this.nodes.values()) {
       const id = crypto.randomUUID();
       this.pings.set(id, { peerId: entry.meta.peerId, at: performance.now() });
       entry.link.send({ type: 'ping', payload: {} }, id);
+
+      // Heartbeat loss is a graph change in its own right — a device can go
+      // silent without the room ever seeing a socket close.
+      const alive = now - entry.lastSeen < STALE_MS;
+      if (alive !== entry.wasAlive) {
+        entry.wasAlive = alive;
+        if (!alive) {
+          this.emit('log', `NODE UNREACHABLE: ${entry.meta.label}`);
+          this.emit('nodeLost', entry.meta.peerId, entry.meta.label);
+          this.emit('graphChanged', { kind: 'node_lost', peerId: entry.meta.peerId, label: entry.meta.label });
+        } else {
+          this.emit('log', `NODE BACK: ${entry.meta.label}`);
+          this.emit('graphChanged', { kind: 'node_joined', peerId: entry.meta.peerId, label: entry.meta.label });
+        }
+      }
     }
     this.publishNodes(); // refreshes alive/kind badges
   }
@@ -250,6 +267,7 @@ export class Hub {
           link: new PeerLink(this.selfId, peer.peerId, this.signaling),
           caps: [],
           lastSeen: Date.now(),
+          wasAlive: true,
         });
         this.emit('log', `NODE JOINED: ${peer.label}`);
         this.emit('graphChanged', { kind: 'node_joined', peerId: peer.peerId, label: peer.label });
