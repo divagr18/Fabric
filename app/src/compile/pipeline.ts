@@ -11,12 +11,13 @@ export type StageMethod =
   | 'compute.embed_text'
   | 'compute.ocr'
   | 'human.request'
+  | 'human.notify'
   | 'host.match'
   | 'host.pick'
   | 'host.compile_pdf';
 
 export const NODE_METHODS: StageMethod[] = [
-  'data.list', 'data.read', 'compute.embed', 'compute.embed_text', 'compute.ocr', 'human.request',
+  'data.list', 'data.read', 'compute.embed', 'compute.embed_text', 'compute.ocr', 'human.request', 'human.notify',
 ];
 export const HOST_METHODS: StageMethod[] = ['host.match', 'host.pick', 'host.compile_pdf'];
 

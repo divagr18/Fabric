@@ -35,6 +35,7 @@ NODE PRIMITIVES (node = a peerId that exposes the method):
 - compute.embed_text  args {"texts": [string]} → {"vectors": [[number]]}  (CLIP text embeddings, same space as images)
 - compute.ocr  args {"fileIds": [string]} → {"items": [{"fileId","text","confidence"}]}
 - human.request  args {"kind": "capture"|"decide"|"approve", "prompt": string, "options"?: [string]} → capture: the photo {"name","mime","bytes"}; decide: {"kind","choice"}; approve: {"kind","approved"}  (a real person answers; prompt is shown to them)
+- human.notify  args {"message": string} → {"delivered": true}  (one-way, non-blocking toast on that device — use to keep the person informed, e.g. after a long step completes)
 
 HOST OPS (node = "host", run on the coordinating device):
 - host.match  args {"query": vector, "items": <one stage's items, OR an array of $from refs to combine several stages' items, e.g. [{"$from":"a","path":"items"},{"$from":"b","path":"items"}]>, "topK"?: number} → {"matches": [{"score", ...item fields}]}

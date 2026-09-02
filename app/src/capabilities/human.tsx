@@ -27,7 +27,20 @@ interface ActiveRequest {
 /** Promise-based controller; NodePage renders the card for the active request. */
 export class HumanController {
   active: ActiveRequest | null = null;
+  notices: Array<{ id: string; text: string }> = [];
   onChange: () => void = () => {};
+
+  /** One-way, non-blocking: show a message from the fabric to this device's person. */
+  notify(text: string) {
+    const id = crypto.randomUUID();
+    this.notices = [...this.notices.slice(-2), { id, text }];
+    try { navigator.vibrate?.(120); } catch { /* iOS */ }
+    this.onChange();
+    setTimeout(() => {
+      this.notices = this.notices.filter((n) => n.id !== id);
+      this.onChange();
+    }, 6000);
+  }
 
   request(req: HumanRequest): Promise<HumanAnswer> {
     if (this.active) return Promise.reject(new Error('a human request is already pending on this node'));
@@ -51,9 +64,20 @@ export function humanCapability(): Capability {
     id: 'human',
     kind: 'human',
     name: 'human',
-    detail: 'capture / decide / approve — always asks first',
-    methods: ['human.request'],
+    detail: 'capture / decide / approve / notify — always asks first',
+    methods: ['human.request', 'human.notify'],
   };
+}
+
+export function NoticeToasts({ notices }: { notices: Array<{ id: string; text: string }> }) {
+  if (notices.length === 0) return null;
+  return (
+    <div style={{ position: 'fixed', left: 12, right: 12, bottom: 12, zIndex: 90, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {notices.map((n) => (
+        <div key={n.id} className="panel toast">🧵 {n.text}</div>
+      ))}
+    </div>
+  );
 }
 
 export function HumanRequestCard({ active }: { active: ActiveRequest }) {

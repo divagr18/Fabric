@@ -366,6 +366,13 @@ code { color: var(--data); word-break: break-all; }
 @keyframes blink {
   50% { opacity: 0.45; }
 }
+.toast {
+  border-left: 3px solid var(--thread);
+  font-size: 15px;
+  padding: 12px 16px;
+  animation: rise 0.25s ease both;
+}
+
 .human-card {
   border: 2px solid var(--thread);
   animation: framePulse 1.4s ease-in-out infinite;

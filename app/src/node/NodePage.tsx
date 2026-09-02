@@ -9,7 +9,7 @@ import { generateSampleFiles } from '../capabilities/samples';
 import { dataList, dataRead } from '../capabilities/data';
 import { Embedder, EmbedStatus } from '../capabilities/embed';
 import { ocrFiles, ocrCapability } from '../capabilities/ocr';
-import { HumanController, HumanRequest, HumanRequestCard, humanCapability } from '../capabilities/human';
+import { HumanController, HumanRequest, HumanRequestCard, NoticeToasts, humanCapability } from '../capabilities/human';
 import { Log, stamp } from '../ui/Log';
 
 export function NodePage({ roomCode }: { roomCode: string }) {
@@ -40,6 +40,12 @@ export function NodePage({ roomCode }: { roomCode: string }) {
       return { vectors: await embedder.embedTexts(texts) };
     });
     agent.register('compute.ocr', (args) => ocrFiles(store, args));
+    agent.register('human.notify', (args) => {
+      const message = String((args as { message?: unknown }).message ?? '').slice(0, 300);
+      if (!message) throw new Error('human.notify needs a "message"');
+      human.notify(message);
+      return { delivered: true };
+    });
     agent.register('human.request', async (args, ctx) => {
       const answer = await human.request(args as HumanRequest);
       if (answer.kind === 'capture') {
@@ -168,6 +174,7 @@ export function NodePage({ roomCode }: { roomCode: string }) {
       <Log lines={lines} />
 
       {human.active && <HumanRequestCard active={human.active} />}
+      <NoticeToasts notices={human.notices} />
     </div>
   );
 }
