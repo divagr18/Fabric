@@ -22,6 +22,7 @@ export interface HotReloadDeps {
   /** Re-registers the tool with an execute that throws `reason`. */
   degrade: (tool: RegisteredTool, reason: string) => Promise<void>;
   onLog?: (line: string) => void;
+  onBanner?: (banner: { kind: 'replanning' | 'swapped' | 'degraded'; text: string } | null) => void;
 }
 
 const DEBOUNCE_MS = 2_000;
@@ -87,6 +88,7 @@ export class HotReloadManager {
           : hit.kind === 'caps_changed' ? `CAPABILITIES CHANGED (${hit.label})`
           : `NODE JOINED (${hit.label})`;
         this.log(`${why} → "${tool.def.name}" ${tool.health === 'degraded' ? 'may heal' : 'stale'} → replanning…`);
+        this.deps.onBanner?.({ kind: 'replanning', text: `⚠ ${why} — REPLANNING "${tool.def.name}"…` });
         await this.replanTool(tool.def.name);
       }
     } finally {
@@ -115,6 +117,7 @@ export class HotReloadManager {
       await this.deps.install(pipeline, tool.goal);
       this.deps.registry.setHealth(name, 'ok');
       this.log(`🔥 ${name} HOT-SWAPPED → v${this.deps.registry.get(name)?.version} (new plan: ${pipeline.stages.map((s) => `${s.method}@${s.node === 'host' ? 'host' : s.node.slice(0, 6)}`).join(' → ')})`);
+      this.deps.onBanner?.({ kind: 'swapped', text: `🔥 ${name} HOT-SWAPPED → v${this.deps.registry.get(name)?.version} — SAME TOOL, NEW TOPOLOGY` });
       return true;
     } catch (err) {
       const missing = describeMissing(tool.pipeline, graph);
@@ -122,6 +125,7 @@ export class HotReloadManager {
       await this.deps.degrade(tool, reason);
       this.deps.registry.setHealth(name, 'degraded');
       this.log(`⚠ ${name} DEGRADED — ${missing}`);
+      this.deps.onBanner?.({ kind: 'degraded', text: `⚠ ${name} DEGRADED — ${missing.split(' — ')[0]}` });
       return false;
     }
   }

@@ -4,7 +4,7 @@ import { Hub, NodeView } from '../transport/hub';
 import { deviceLabel, makeRoomCode, myPeerId } from '../transport/protocol';
 import { SignalingStatus } from '../transport/signaling';
 import { WebMcpRegistry } from '../webmcp/registry';
-import { installCoreSurface } from '../webmcp/surface';
+import { Banner, installCoreSurface } from '../webmcp/surface';
 import { SurfacePanel } from '../ui/SurfacePanel';
 import { Log, stamp } from '../ui/Log';
 
@@ -30,7 +30,11 @@ export function HostPage() {
   const [approval, setApproval] = useState<{ what: string; resolve: (ok: boolean) => void } | null>(null);
   const [hotReloads, setHotReloads] = useState(0);
   const [stages, setStages] = useState<Array<{ id: string; method: string; node: string; status: string }>>([]);
+  const [banner, setBanner] = useState<Banner | null>(null);
+  const [preview, setPreview] = useState<{ url: string; name: string; score?: number } | null>(null);
+  const [artifact, setArtifact] = useState<{ url: string; name: string } | null>(null);
   const hubRef = useRef<Hub | null>(null);
+  const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const joinUrl = `${location.origin}/r/${roomCode}`;
   const registry = useMemo(() => new WebMcpRegistry(), []);
@@ -57,6 +61,14 @@ export function HostPage() {
       onApprove: (what) => new Promise<boolean>((resolve) => {
         setApproval({ what, resolve: (ok) => { setApproval(null); resolve(ok); } });
       }),
+      onBanner: (b) => {
+        if (bannerTimer.current) clearTimeout(bannerTimer.current);
+        setBanner(b);
+        if (b && b.kind !== 'compiling' && b.kind !== 'replanning') {
+          bannerTimer.current = setTimeout(() => setBanner(null), 5000);
+        }
+      },
+      onRunStart: () => setStages([]),
       onStage: (stage, status, detail) => {
         addLine(`stage ${stage.id} [${stage.method} @ ${stage.node === 'host' ? 'host' : stage.node}] ${status}${detail ? ` — ${detail}` : ''}`);
         setStages((prev) => {
@@ -65,9 +77,21 @@ export function HostPage() {
           return next.slice(-12);
         });
       },
+      onPreview: (p) => {
+        const url = URL.createObjectURL(new Blob([p.bytes.buffer as ArrayBuffer], { type: p.mime }));
+        setPreview((old) => {
+          if (old) URL.revokeObjectURL(old.url);
+          return { url, name: p.name, score: p.score };
+        });
+        addLine(`↓ result preview ${p.name} (${(p.bytes.length / 1024).toFixed(0)}KB) — fetched peer-to-peer`);
+      },
       onArtifact: (a) => {
         const url = URL.createObjectURL(new Blob([a.bytes.buffer as ArrayBuffer], { type: a.mime }));
         addLine(`📄 artifact ready: ${a.name} (${(a.bytes.length / 1024).toFixed(0)}KB) — compiled locally`);
+        setArtifact((old) => {
+          if (old) URL.revokeObjectURL(old.url);
+          return { url, name: a.name };
+        });
         const link = document.createElement('a');
         link.href = url;
         link.download = a.name;
@@ -172,6 +196,9 @@ export function HostPage() {
 
   return (
     <div>
+      {banner && (
+        <div className={`banner b-${banner.kind}`}>{banner.text}</div>
+      )}
       <h1>Fabric <span className="dim">· host</span></h1>
       <span className={`badge status-${status}`}>{status}</span>{' '}
       <span className="dim">room</span> <code>{roomCode}</code>
@@ -268,18 +295,38 @@ export function HostPage() {
           <SurfacePanel registry={registry} />
           <div className="panel">
             <h2>Execution</h2>
-            {stages.length === 0 && <p className="dim" style={{ margin: 0 }}>stages light up here when a compiled tool runs</p>}
-            {stages.map((s) => (
-              <p key={s.id} style={{ margin: '4px 0' }}>
-                <span className={`badge${s.status === 'running' ? ' pulse' : ''}`} style={{
-                  color: s.status === 'done' ? 'var(--ok)' : s.status === 'failed' ? 'var(--bad)' : 'var(--compute)',
-                  borderColor: s.status === 'done' ? 'var(--ok)' : s.status === 'failed' ? 'var(--bad)' : 'var(--compute)',
-                }}>{s.status}</span>{' '}
-                <code>{s.method}</code>{' '}
-                <span className="dim">@ {s.node === 'host' ? 'host' : (nodes.find((n) => n.peerId === s.node)?.label ?? s.node)}</span>
-              </p>
-            ))}
+            {stages.length === 0 && <p className="dim" style={{ margin: 0 }}>the pipeline lights up here when a compiled tool runs</p>}
+            <div className="flow">
+              {stages.map((s, i) => (
+                <span key={s.id} style={{ display: 'contents' }}>
+                  {i > 0 && <span className="flow-arrow">→</span>}
+                  <span className={`flow-stage fs-${s.status}${s.status === 'running' ? ' pulse' : ''}`}>
+                    <b>{s.method}</b>
+                    <small>@ {s.node === 'host' ? 'host' : (nodes.find((n) => n.peerId === s.node)?.label ?? s.node)}</small>
+                  </span>
+                </span>
+              ))}
+            </div>
           </div>
+          {preview && (
+            <div className="panel">
+              <h2>Result</h2>
+              <img className="preview-img" src={preview.url} alt={preview.name} />
+              <p className="dim" style={{ margin: '8px 0 0', fontSize: 12 }}>
+                top match <code>{preview.name}</code>{preview.score != null && <> · score {preview.score}</>}<br />
+                fetched peer-to-peer — never a server
+              </p>
+            </div>
+          )}
+          {artifact && (
+            <div className="panel">
+              <h2>Artifact</h2>
+              <object data={artifact.url} type="application/pdf" style={{ width: '100%', height: 260, borderRadius: 6 }}>
+                <p className="dim">PDF preview unavailable — downloaded as <code>{artifact.name}</code></p>
+              </object>
+              <p className="dim" style={{ margin: '8px 0 0', fontSize: 12 }}><code>{artifact.name}</code> — compiled on this device</p>
+            </div>
+          )}
         </div>
       </div>
 

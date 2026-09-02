@@ -63,12 +63,12 @@ export function HumanRequestCard({ active }: { active: ActiveRequest }) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(1,4,9,0.92)', zIndex: 100,
+      position: 'fixed', inset: 0, background: 'rgba(6,8,16,0.96)', zIndex: 100,
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
     }}>
-      <div className="panel" style={{ maxWidth: 420, width: '100%' }}>
-        <h2 style={{ marginTop: 0 }}>Fabric requests</h2>
-        <p style={{ fontSize: 16 }}>{req.prompt}</p>
+      <div className="panel human-card" style={{ maxWidth: 440, width: '100%' }}>
+        <h2>You are a stage in this pipeline</h2>
+        <p style={{ fontSize: 19, lineHeight: 1.5, margin: '10px 0 18px' }}>{req.prompt}</p>
 
         {req.kind === 'capture' && (
           <>

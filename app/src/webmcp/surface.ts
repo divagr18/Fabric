@@ -10,8 +10,15 @@ import { RegisteredTool, WebMcpRegistry } from './registry';
  * This file is what a judge should read to see how Fabric leverages WebMCP.
  */
 
+export interface Banner {
+  kind: 'compiling' | 'registered' | 'replanning' | 'swapped' | 'degraded';
+  text: string;
+}
+
 export interface SurfaceEvents extends ExecutionEvents {
   onLog?: (line: string) => void;
+  /** Big-moment strip on the host UI; null clears a sticky banner. */
+  onBanner?: (banner: Banner | null) => void;
 }
 
 async function planOnce(body: Record<string, unknown>): Promise<Pipeline> {
@@ -120,6 +127,7 @@ export function installCoreSurface(
     install: registerCompiled,
     degrade,
     onLog: log,
+    onBanner: events.onBanner,
   });
   manager.start();
 
@@ -163,30 +171,44 @@ export function installCoreSurface(
         throw new Error('no nodes are connected — ask the user to join a device first');
       }
       log(`compiling: "${goal.slice(0, 80)}"…`);
+      events.onBanner?.({
+        kind: 'compiling',
+        text: `◉ COMPILING NEW TOOL — planning across ${graph.nodes.filter((n) => n.online).length} device(s)…`,
+      });
       const base = { goal, constraints: args.constraints, graph, existingTools: registry.names() };
 
-      let pipeline = await planOnce(base);
-      let verdict = validatePipeline(pipeline, graph, registry.names());
-      if (!verdict.ok) {
-        log(`plan rejected (${verdict.errors.length} error(s)) — asking planner to fix`);
-        pipeline = await planOnce({ ...base, previousPipeline: pipeline, previousErrors: verdict.errors });
-        verdict = validatePipeline(pipeline, graph, registry.names());
-      }
-      if (!verdict.ok) {
-        throw new Error(`could not compile a valid pipeline: ${verdict.errors.join('; ')}`);
-      }
+      try {
+        let pipeline = await planOnce(base);
+        let verdict = validatePipeline(pipeline, graph, registry.names());
+        if (!verdict.ok) {
+          log(`plan rejected (${verdict.errors.length} error(s)) — asking planner to fix`);
+          pipeline = await planOnce({ ...base, previousPipeline: pipeline, previousErrors: verdict.errors });
+          verdict = validatePipeline(pipeline, graph, registry.names());
+        }
+        if (!verdict.ok) {
+          throw new Error(`could not compile a valid pipeline: ${verdict.errors.join('; ')}`);
+        }
 
-      await registerCompiled(pipeline, goal);
-      log(`⚡ ${pipeline.toolName} REGISTERED (${pipeline.stages.length} stages)`);
-      return {
-        registered: pipeline.toolName,
-        description: pipeline.description,
-        stages: pipeline.stages.length,
-        devices_used: [...new Set(pipeline.stages.map((s) => s.node))],
-        next: `The tool "${pipeline.toolName}" is now in your tool list — call it directly.`,
-      };
+        await registerCompiled(pipeline, goal);
+        log(`⚡ ${pipeline.toolName} REGISTERED (${pipeline.stages.length} stages)`);
+        events.onBanner?.({ kind: 'registered', text: `⚡ ${pipeline.toolName} REGISTERED VIA WEBMCP` });
+        return await afterRegister(pipeline);
+      } catch (err) {
+        events.onBanner?.(null);
+        throw err;
+      }
     },
   }, 'core');
+
+  async function afterRegister(pipeline: Pipeline) {
+    return {
+      registered: pipeline.toolName,
+      description: pipeline.description,
+      stages: pipeline.stages.length,
+      devices_used: [...new Set(pipeline.stages.map((s) => s.node))],
+      next: `The tool "${pipeline.toolName}" is now in your tool list — call it directly.`,
+    };
+  }
 
   void registry.register({
     name: 'revoke_tool',

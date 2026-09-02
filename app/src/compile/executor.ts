@@ -13,8 +13,11 @@ export interface ExecutionError extends Error {
 }
 
 export interface ExecutionEvents {
+  onRunStart?: (toolName: string) => void;
   onStage?: (stage: Stage, status: StageStatus, detail?: string) => void;
   onArtifact?: (artifact: { name: string; mime: string; bytes: Uint8Array }) => void;
+  /** Top-ranked match's image, fetched peer-to-peer after host.match for the result view. */
+  onPreview?: (p: { name: string; mime: string; bytes: Uint8Array; score?: number }) => void;
   /** Authority stays human: irreversible outputs need a tap from the host's user. */
   onApprove?: (what: string) => Promise<boolean>;
 }
@@ -55,6 +58,7 @@ export class Executor {
   constructor(private hub: Hub, private events: ExecutionEvents = {}) {}
 
   async run(pipeline: Pipeline, input: Record<string, unknown>): Promise<unknown> {
+    this.events.onRunStart?.(pipeline.toolName);
     const results = new Map<string, unknown>();
     for (const layer of topoLayers(pipeline.stages)) {
       await Promise.all(layer.map(async (stage) => {
@@ -85,7 +89,28 @@ export class Executor {
       const blob = await this.hub.blobs.waitFor(result.transferId);
       return { ...result, name: blob.name, mime: blob.mime, bytes: blob.bytes };
     }
+    // Provenance: tag list items with the node that produced them, so later
+    // stages (and the result preview) know where a fileId lives.
+    if (result && typeof result === 'object' && Array.isArray((result as { items?: unknown[] }).items)) {
+      const r = result as { items: unknown[] };
+      r.items = r.items.map((it) => (it && typeof it === 'object' ? { ...it, node: stage.node } : it));
+    }
     return result;
+  }
+
+  /** Fire-and-forget: pull the top match's image from its node for the host's result view. */
+  private async fetchPreview(match: Record<string, unknown> | undefined) {
+    try {
+      if (!match || typeof match.fileId !== 'string' || typeof match.node !== 'string') return;
+      const meta = await this.hub.rpc(match.node, 'data.read', { fileId: match.fileId }) as { transferId?: string };
+      if (typeof meta?.transferId !== 'string') return;
+      const blob = await this.hub.blobs.waitFor(meta.transferId);
+      if (!blob.mime.startsWith('image/')) return;
+      this.events.onPreview?.({
+        name: blob.name, mime: blob.mime, bytes: blob.bytes,
+        score: typeof match.score === 'number' ? match.score : undefined,
+      });
+    } catch { /* preview is best-effort; the tool result already returned */ }
   }
 
   private async runHostOp(stage: Stage, args: Record<string, unknown>): Promise<unknown> {
@@ -110,7 +135,9 @@ export class Executor {
           withVectors.map((it) => ({ item: it, vector: it.vector })),
           topK,
         );
-        return { matches: ranked.map((r) => ({ score: Number(r.score.toFixed(4)), ...stripVector(r.item) })) };
+        const matches = ranked.map((r) => ({ score: Number(r.score.toFixed(4)), ...stripVector(r.item) }));
+        void this.fetchPreview(matches[0]);
+        return { matches };
       }
       case 'host.pick': {
         // glue: select a path, then optionally slice and project fields
