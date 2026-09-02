@@ -117,7 +117,7 @@ export class HotReloadManager {
       await this.deps.install(pipeline, tool.goal);
       this.deps.registry.setHealth(name, 'ok');
       this.log(`🔥 ${name} HOT-SWAPPED → v${this.deps.registry.get(name)?.version} (new plan: ${pipeline.stages.map((s) => `${s.method}@${s.node === 'host' ? 'host' : s.node.slice(0, 6)}`).join(' → ')})`);
-      this.deps.onBanner?.({ kind: 'swapped', text: `🔥 ${name} HOT-SWAPPED → v${this.deps.registry.get(name)?.version} — SAME TOOL, NEW TOPOLOGY` });
+      this.deps.onBanner?.({ kind: 'swapped', text: `🔥 ${name} HOT-SWAPPED → v${this.deps.registry.get(name)?.version}` });
       return true;
     } catch (err) {
       const missing = describeMissing(tool.pipeline, graph);
