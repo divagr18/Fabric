@@ -2,7 +2,7 @@
 
 Fabric turns your devices into one live runtime where agents build, run, and hot-swap WebMCP tools from the files, cameras, compute, and people available right now.
 
-[Try Fabric live](https://fabric.keshav-agr2007.workers.dev) · [Explore the source](https://github.com/divagr18/fabric) · [Watch the demo](https://youtu.be/cw65XLqgKRg)
+[Try Fabric live](https://fabric.keshav-agr2007.workers.dev) · [Explore the source](https://github.com/divagr18/fabric) · [Watch the demo](https://youtu.be/Gzw9uTK5uZ4)
 
 ## Inspiration
 
@@ -27,6 +27,8 @@ If a device leaves, Fabric replans affected tools against the remaining graph an
 ## Why this use case is a strong fit for WebMCP
 
 Most WebMCP applications expose a fixed set of developer-defined tools. Fabric exposes a tool compiler: it creates new WebMCP tools from the devices, people, and capabilities available right now, then rebuilds them under a stable interface when that environment changes.
+
+Fabric is built on a simple philosophy: tools should be dynamic and plug-and-play. A device or person can join, expose a capability, and immediately become part of tools an agent creates for the task at hand. When that participant leaves, Fabric adapts the implementation without forcing the agent to learn a new interface.
 
 WebMCP is what makes this possible. Registration lets Fabric add a task-specific tool during a conversation. Registration cancellation lets it revoke or replace that tool. The tool-change lifecycle lets the agent discover the new version. Most importantly, the browser remains the permission boundary: an agent reaches a device only through capabilities its owner explicitly shared.
 
