@@ -25,7 +25,7 @@ export interface HotReloadDeps {
   onBanner?: (banner: { kind: 'replanning' | 'swapped' | 'degraded'; text: string } | null) => void;
 }
 
-const DEBOUNCE_MS = 2_000;
+const DEBOUNCE_MS = 700;
 const REPLAN_COOLDOWN_MS = 10_000;
 /** After a host (re)load, wait for nodes to reconnect and re-advertise before
  *  any replan — otherwise restored tools churn against a half-empty graph. */

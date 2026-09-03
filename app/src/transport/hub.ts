@@ -35,8 +35,11 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>;
 }
 
-const HEARTBEAT_MS = 3_000;
-const STALE_MS = 8_000;
+const HEARTBEAT_MS = 1_500;
+const STALE_MS = 4_000;
+/** After a peer connection drops, give the node one ping over the relay to prove
+ *  it is still there before declaring it lost. */
+const PROBE_GRACE_MS = 1_800;
 
 /** Per-method RPC budgets: humans take minutes, models take a while, everything else is quick. */
 function rpcTimeout(method: string): number {
@@ -144,20 +147,40 @@ export class Hub {
 
       // Heartbeat loss is a graph change in its own right — a device can go
       // silent without the room ever seeing a socket close.
-      const alive = now - entry.lastSeen < STALE_MS;
-      if (alive !== entry.wasAlive) {
-        entry.wasAlive = alive;
-        if (!alive) {
-          this.emit('log', `NODE UNREACHABLE: ${entry.meta.label}`);
-          this.emit('nodeLost', entry.meta.peerId, entry.meta.label);
-          this.emit('graphChanged', { kind: 'node_lost', peerId: entry.meta.peerId, label: entry.meta.label });
-        } else {
-          this.emit('log', `NODE BACK: ${entry.meta.label}`);
-          this.emit('graphChanged', { kind: 'node_joined', peerId: entry.meta.peerId, label: entry.meta.label });
-        }
-      }
+      this.setLiveness(entry, now - entry.lastSeen < STALE_MS);
     }
     this.publishNodes(); // refreshes alive/kind badges
+  }
+
+  private setLiveness(entry: NodeEntry, alive: boolean) {
+    if (alive === entry.wasAlive) return;
+    entry.wasAlive = alive;
+    if (!alive) {
+      this.emit('log', `NODE UNREACHABLE: ${entry.meta.label}`);
+      this.emit('nodeLost', entry.meta.peerId, entry.meta.label);
+      this.emit('graphChanged', { kind: 'node_lost', peerId: entry.meta.peerId, label: entry.meta.label });
+    } else {
+      this.emit('log', `NODE BACK: ${entry.meta.label}`);
+      this.emit('graphChanged', { kind: 'node_joined', peerId: entry.meta.peerId, label: entry.meta.label });
+    }
+    this.publishNodes();
+  }
+
+  /**
+   * A dropped peer connection usually means the tab closed — but it can also
+   * mean p2p degraded while the relay is fine. Ping once and decide fast.
+   */
+  private probeLiveness(peerId: PeerId) {
+    const entry = this.nodes.get(peerId);
+    if (!entry) return;
+    const id = crypto.randomUUID();
+    this.pings.set(id, { peerId, at: performance.now() });
+    entry.link.send({ type: 'ping', payload: {} }, id);
+    const sentAt = Date.now();
+    setTimeout(() => {
+      const still = this.nodes.get(peerId);
+      if (still && still.lastSeen < sentAt) this.setLiveness(still, false);
+    }, PROBE_GRACE_MS);
   }
 
   /** Current capability graph across all nodes (planner input) — derived from the same snapshot as views(). */
@@ -210,6 +233,8 @@ export class Hub {
             onState: (open) => {
               this.emit('log', `${entry.meta.label}: channel ${open ? 'p2p open' : 'p2p closed → relay'}`);
               this.publishNodes();
+              // a closing tab drops the peer connection first — check liveness now
+              if (!open) this.probeLiveness(entry.meta.peerId);
             },
           });
         }
