@@ -3,3 +3,4 @@ app/dist/
 .wrangler/
 .dev.vars
 *.log
+devpost-submission.md
