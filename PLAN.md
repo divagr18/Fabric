@@ -117,7 +117,7 @@ Goal: ChatGPT compiles a tool and calls it, end to end. **The project's spine da
 - [ ] `inspect_fabric` returns the capability graph in agent-friendly form (semantic, not raw devices)
 
 ### 3.2 Planner (~4h)
-- [ ] Worker endpoint `POST /plan`: goal + constraints + capability graph → pipeline JSON ( API, small/fast model, strict JSON output)
+- [ ] Worker endpoint `POST /plan`: goal + constraints + capability graph → pipeline JSON (OpenAI API, small/fast model, strict JSON output)
 - [ ] Pipeline schema: DAG of primitive invocations with node bindings, data-flow refs, human stages, `no_cloud_upload` constraint honored structurally (no primitive can exfiltrate — enforce in executor, not just prompt)
 - [ ] Validator: every referenced primitive exists in the current graph; reject + honest error back to the agent otherwise; one retry with validator feedback
 - [ ] Test with 5+ goal phrasings of the Packet task; pin the demo phrasing that plans best
