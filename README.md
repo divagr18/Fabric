@@ -1,16 +1,14 @@
 # Fabric
 
-**A WebMCP runtime that lets ChatGPT build tools across your devices.**
+> Fabric turns your devices into one living runtime where agents build, run, and hot-swap WebMCP tools from the files, cameras, compute, and people available right now.
 
-Your useful data and hardware rarely live in one place. Photos are on your phone, documents are on your laptop, and sometimes the missing input is something only you can provide.
+[Try Fabric](https://fabric.keshav-agr2007.workers.dev) · [Watch the demo](https://youtu.be/Gzw9uTK5uZ4) · [MIT License](LICENSE)
 
-Fabric connects those browsers into one runtime. You choose what each device shares. ChatGPT can then ask Fabric to create a tool for a specific task, such as searching photos across devices. Fabric plans the work, validates the pipeline, and registers the new tool through [WebMCP](https://github.com/webmachinelearning/webmcp) while the conversation is still running.
+Fabric runs on a simple philosophy: tools should be dynamic and plug-and-play.
 
-Computation runs where the data lives. In the photo-search demo, embeddings are generated on the phone and only vectors travel peer to peer. The raw photos stay on the phone. When the hardware changes, Fabric replans affected tools and hot-reloads them under the same name and schema.
+A phone, laptop, desktop, or person can join the fabric and contribute only the capabilities its user chooses to share. An agent can compile those capabilities into a task-specific tool and call it during the same conversation. When capabilities change, Fabric replans and hot-swaps the implementation while keeping the tool's name and input schema stable.
 
-**Live demo:** https://fabric.keshav-agr2007.workers.dev
-
-Open it in ChatGPT's in-app browser, or Chrome 149+ with `chrome://flags/#enable-webmcp-testing`. One laptop and two tabs are enough; Fabric can generate the sample files for you.
+Fabric uses [WebMCP](https://github.com/webmachinelearning/webmcp) as the tool interface, WebRTC for direct browser-to-browser transport, local models for private computation, and Cloudflare Workers and Durable Objects for coordination and persistence.
 
 ## See it in 30 seconds
 
@@ -26,19 +24,19 @@ Open it in ChatGPT's in-app browser, or Chrome 149+ with `chrome://flags/#enable
 
    > Find the dog.
 
-The search tool did not exist when the session began. ChatGPT created it from the capabilities currently shared by your devices, then called it in the same conversation.
+The search tool did not exist when the session began. Fabric compiled it from the capabilities shared by the connected devices, registered it through WebMCP, and ChatGPT called it in the same conversation.
 
-## The problem
+## One runtime for people, agents, and devices
 
-Agents can only use the tools a site registered in advance. Meanwhile, the capabilities a person wants to use change from moment to moment: a phone joins with a camera, a laptop shares a folder, a desktop offers a GPU, or a person becomes available to make a judgment call.
+Agents can reason across a task, but the capabilities they need are scattered across the devices and people around us. Photos sit on a phone, documents live on a laptop, compute may be available on a desktop, and some steps require a person to capture something, decide, or approve an action.
 
-Moving all of that into one cloud service creates a second problem. People must upload private files, duplicate data between devices, or install a specialized runtime everywhere before an agent can help.
+Bringing those pieces together usually means uploading private data to one cloud service or installing a specialized runtime on every device. Fabric takes a different approach: browsers, people, and agents contribute explicit capabilities to one shared runtime.
 
-Fabric gives the agent one live tool surface over the browsers the person already has. The person decides what enters that surface. The agent decides how to compose the available capabilities for the task.
+The person controls what enters the fabric. The agent decides how to compose the available capabilities for the task. A device or person can join, contribute something useful, and leave again without forcing the agent to learn a new interface.
 
-## The demonstrated workflow
+## Two demonstrated workflows
 
-In the main demo, ChatGPT asks Fabric to create a cross-device photo-search tool:
+### Cross-device photo search
 
 1. `inspect_fabric` reports the capabilities each device has explicitly shared.
 2. `compile_tool` sends the goal and current capability graph to the planner.
@@ -47,30 +45,22 @@ In the main demo, ChatGPT asks Fabric to create a cross-device photo-search tool
 5. The compiled tool embeds the text query and phone photos locally, then ranks the vectors on the host.
 6. If a device disappears, Fabric replans the same tool against the surviving graph and re-registers it with the same interface.
 
-The PDF workflow adds a person to the graph. ChatGPT can ask someone to photograph a paper form, resume the pipeline when the photo arrives, and pause the final export for approval.
+The phone computes CLIP embeddings locally and sends vectors peer-to-peer for ranking. After Fabric selects a result, only that preview moves to the host. The photos and preview never pass through a central server.
 
-## Why WebMCP is essential
+### Human-assisted document packet
 
-Normal WebMCP sites expose tools chosen by the developer. Fabric keeps that standard interface but makes the available surface dynamic:
+The second workflow adds a person to the graph. An agent asks someone to photograph a paper form, resumes the pipeline when the capture arrives, runs OCR, and pauses the final PDF export for approval. The person can respond or decline without leaving the workflow.
+
+## Why WebMCP
+
+Most WebMCP applications expose a fixed set of developer-defined tools. Fabric uses WebMCP as a dynamic compilation target:
 
 - `compile_tool` can register a task-specific tool during an active conversation.
 - Aborting a registration and registering the same name again gives Fabric a clean hot-reload mechanism.
 - The browser page remains the permission boundary. An agent reaches a device only through the capabilities its owner shared.
 - The `toolchange` lifecycle lets the agent discover a tool that did not exist when the conversation started.
 
-A CLI agent has no standard install path onto a phone, no direct route to its camera, and no common tool surface spanning several browsers. WebMCP supplies that surface.
-
-## What people and agents can do together
-
-Fabric treats human judgment as a capability rather than an interruption outside the workflow. `request_from_human` lets an agent ask a person to capture a physical document, choose between options, or approve an action. The request appears on the selected device and the person can always decline.
-
-People also steer the runtime itself. Revoking a shared capability changes the graph under the agent. Fabric either moves the work to another device or reports exactly why the tool can no longer run.
-
-## Why this matters
-
-Fabric points toward a web where every browser can contribute to a personal, programmable computer. An agent could assemble a temporary tool from cameras, local models, private files, nearby hardware, and human judgment without waiting for one company to build the entire workflow into a centralized product.
-
-That changes the role of a website. Instead of exposing a fixed menu of actions, it can give an agent safe building blocks and let the user decide which devices and data participate. The result is an open execution layer that can grow as new browsers and capabilities join it, while authority stays with the people who own them.
+This creates a different model for human-agent interaction. People do more than issue prompts: they lend capabilities, provide physical-world input, make decisions, and retain authority over what the agent may use. Agents do more than operate a predefined application: they assemble temporary tools from the people and devices available for the task.
 
 ## How WebMCP is implemented
 
@@ -124,27 +114,15 @@ ChatGPT:     "Dog-photo matches:
               2. 78336.png - 0.2049"
 ```
 
-The phone creates the embeddings. The raw photos stay there. ChatGPT receives the ranked result through the compiled WebMCP tool.
+The phone creates the embeddings and sends vectors for ranking. The selected preview moves peer-to-peer to the host, never through a central server. ChatGPT receives the ranked result through the compiled WebMCP tool.
 
-## Architecture
+## Cloudflare architecture
 
-```text
-        ChatGPT
-           |
-           | WebMCP: core tools and runtime-compiled tools
-           |
-    Fabric host page
-    registry | planner | validator | executor | hot reload
-           |
-           | WebRTC DataChannels, with Durable Object relay fallback
-           |
-     laptop     desktop     phone     human
-     files      files+GPU   camera    capture/decide/approve
-```
+A Cloudflare Worker serves the app, accepts WebSocket upgrades, exposes the planner endpoint, and proxies model files through the same origin.
 
-One Cloudflare Worker serves the app, signaling, the model proxy, and the planner endpoint.
+Each room is coordinated by a Durable Object. It provides a stable address and ordered event stream for joins, departures, signaling, and relayed messages. It also stores compiled tool definitions. After a host reload, saved tools return in a degraded state and heal as suitable devices reconnect.
 
-Each room is backed by a Cloudflare Durable Object. The object gives the room a stable address and a single ordered event stream for joins, departures, roster changes, and relayed messages, so Fabric does not need a separate consensus or leader-election layer. WebSocket Hibernation keeps idle rooms inexpensive, and Durable Object storage lets compiled tools survive after the browsers disconnect. Restored tools return in a degraded state and heal when suitable devices rejoin.
+Browsers prefer direct WebRTC DataChannels for binary transfers and vectors. If a direct connection cannot open, the Durable Object relays the traffic. WebSocket Hibernation evicts idle compute while keeping connections alive, so a personal fabric costs almost nothing in compute to keep parked at the edge until its user returns.
 
 ## Measured on real hardware
 

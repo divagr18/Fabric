@@ -18,7 +18,7 @@ Fabric turns the browsers across a person's devices into one agent-accessible ru
 
 An agent starts with five core WebMCP tools. It can inspect the current fabric, compile a task-specific tool, inspect the resulting pipeline, revoke a compiled tool, or request help from a person. Fabric validates every planned stage before registration; compiled tools are pipelines over a fixed primitive vocabulary, not arbitrary generated code.
 
-In the main demonstration, an agent creates a photo-search tool from capabilities shared by a phone and laptop, then calls it to find a dog. The phone generates the image embeddings locally, the host ranks the results, and only vectors move peer to peer. The raw photos never leave the phone.
+In the main demonstration, an agent creates a photo-search tool from capabilities shared by a phone and laptop, then calls it to find a dog. The phone generates image embeddings locally and sends vectors peer to peer for ranking. After Fabric selects a result, only that preview moves peer to peer to the host; it never passes through a central server.
 
 Fabric also makes human-in-the-loop collaboration part of the runtime itself. An agent can ask someone to photograph a paper form, wait for the response, and pause a PDF export until that person approves it. The human is not an exception outside the workflow; capture, judgment, and approval are capabilities that can be composed into the tool alongside files and compute.
 
@@ -76,7 +76,7 @@ The build hit several real failures. Hugging Face stopped returning the CORS hea
 
 The working prototype registers tools during an active conversation, executes validated multi-device pipelines, transfers data peer to peer, and pauses for human input and approval. These are not isolated technical demos: they form one coherent runtime where devices and people can join, contribute a capability, and leave while an agent continues working.
 
-In the photo-search demo, an agent creates and calls a tool that did not exist when the session began, while the raw photos stay on the phone. In the document demo, the same pipeline model schedules OCR, a physical-world capture, a file operation, and a human approval gate. Together, these flows demonstrate that both machines and people can be composable participants in one WebMCP runtime.
+In the photo-search demo, an agent creates and calls a tool that did not exist when the session began. Embeddings stay local, vectors move peer to peer for ranking, and only the selected preview travels to the host. In the document demo, the same pipeline model schedules OCR, a physical-world capture, a file operation, and a human approval gate. Together, these flows demonstrate that both machines and people can be composable participants in one WebMCP runtime.
 
 Compiled tool definitions persist in Durable Object storage, so reloading the host does not erase the tools the agent created. They return in a degraded state and heal as suitable devices reconnect. When a device is removed, Fabric automatically detects the changed graph, replans the affected tool, and hot-registers version two under the same name and input schema. The agent keeps calling the same tool even though its implementation and device placement changed underneath it.
 
@@ -95,6 +95,6 @@ The next step is cross-vendor use: one fabric page serving more than one WebMCP-
 5. After the new tool registers, ask it to find the dog.
 6. Inspect the compiled pipeline in Fabric's surface panel or with `inspect_tool`.
 
-Expected result: Fabric registers the new photo-search tool during the conversation, the agent calls it successfully, and the dog image ranks first without the raw photos leaving the device that shared them.
+Expected result: Fabric registers the new photo-search tool during the conversation, the agent calls it successfully, and the dog image ranks first. The phone sends vectors for ranking and transfers only the selected preview peer to peer to the host.
 
 For the full demonstration, also share the document samples, keep a printed form nearby, compile the PDF-packet workflow, respond to the phone's capture request, and approve the export on the host.
