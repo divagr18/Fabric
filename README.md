@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://fabric.keshav-agr2007.workers.dev">
-    <img src="docs/readme-banner.svg" alt="Fabric: one living runtime for agents, devices, and people" width="100%">
+    <img src="docs/fabric-readme-banner.svg" alt="Fabric: one living runtime for agents, devices, and people" width="100%">
   </a>
 </p>
 
