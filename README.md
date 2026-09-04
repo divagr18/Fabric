@@ -1,12 +1,12 @@
 <p align="center">
   <a href="https://fabric.keshav-agr2007.workers.dev">
-    <img src="docs/fabric-readme-banner.svg" alt="Fabric: one living runtime for agents, devices, and people" width="100%">
+    <img src="docs/fabric-readme-banner-v2.svg" alt="Fabric connects your devices so agents can build, run, and hot-swap WebMCP tools" width="100%">
   </a>
 </p>
 
 # Fabric
 
-> Fabric turns your devices into one living runtime where agents build, run, and hot-swap WebMCP tools from the files, cameras, compute, and people available right now.
+> Fabric connects your devices so agents can build, run, and hot-swap WebMCP tools from whatever files, cameras, compute, and people are available right now.
 
 [Try Fabric](https://fabric.keshav-agr2007.workers.dev) · [Watch the demo](https://youtu.be/Gzw9uTK5uZ4) · [MIT License](LICENSE)
 
