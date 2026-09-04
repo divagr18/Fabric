@@ -1,9 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" role="img" aria-labelledby="title desc">
   <title id="title">Fabric, one living runtime</title>
-  <desc id="desc">Files, cameras, compute, and people connect into a dynamic WebMCP tool.</desc>
+  <desc id="desc">Laptops, phones, PCs, and people contribute files, cameras, compute, and approval to a dynamic WebMCP tool.</desc>
 
   <rect width="1600" height="600" fill="#000"/>
-  <rect x="0.5" y="0.5" width="1599" height="599" fill="none" stroke="#262626"/>
 
   <g font-family="Geist, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
     <text x="88" y="112" fill="#8f8f8f" font-size="20" letter-spacing="0.2">Dynamic WebMCP runtime</text>
@@ -12,30 +11,43 @@
     <text x="88" y="350" fill="#ededed" font-size="36" font-weight="400" letter-spacing="-1">devices, and people.</text>
 
     <g transform="translate(818 92)">
-      <line x1="0" y1="55" x2="188" y2="55" stroke="#444"/>
-      <line x1="0" y1="135" x2="188" y2="135" stroke="#444"/>
-      <line x1="0" y1="215" x2="188" y2="215" stroke="#444"/>
-      <line x1="0" y1="295" x2="188" y2="295" stroke="#444"/>
-      <line x1="188" y1="55" x2="188" y2="295" stroke="#444"/>
-      <line x1="188" y1="175" x2="278" y2="175" stroke="#ededed"/>
+      <line x1="0" y1="55" x2="188" y2="55" stroke="#525252" stroke-width="2"/>
+      <line x1="0" y1="135" x2="188" y2="135" stroke="#525252" stroke-width="2"/>
+      <line x1="0" y1="215" x2="188" y2="215" stroke="#525252" stroke-width="2"/>
+      <line x1="0" y1="295" x2="188" y2="295" stroke="#525252" stroke-width="2"/>
+      <line x1="188" y1="55" x2="188" y2="295" stroke="#525252" stroke-width="2"/>
+      <line x1="188" y1="175" x2="278" y2="175" stroke="#ededed" stroke-width="2"/>
 
-      <circle cx="0" cy="55" r="4" fill="#ededed"/>
-      <circle cx="0" cy="135" r="4" fill="#ededed"/>
-      <circle cx="0" cy="215" r="4" fill="#ededed"/>
-      <circle cx="0" cy="295" r="4" fill="#ededed"/>
-      <circle cx="188" cy="175" r="5" fill="#ededed"/>
+      <circle cx="0" cy="55" r="5" fill="#ededed"/>
+      <circle cx="0" cy="135" r="5" fill="#ededed"/>
+      <circle cx="0" cy="215" r="5" fill="#ededed"/>
+      <circle cx="0" cy="295" r="5" fill="#ededed"/>
+      <circle cx="188" cy="175" r="6" fill="#ededed"/>
 
-      <text x="20" y="62" fill="#a1a1a1" font-size="20">Files</text>
-      <text x="20" y="142" fill="#a1a1a1" font-size="20">Cameras</text>
-      <text x="20" y="222" fill="#a1a1a1" font-size="20">Compute</text>
-      <text x="20" y="302" fill="#a1a1a1" font-size="20">People</text>
+      <g>
+        <rect x="14" y="28" width="126" height="53" fill="#000"/>
+        <text x="20" y="51" fill="#ededed" font-size="19" font-weight="500">Laptops</text>
+        <text x="20" y="73" fill="#737373" font-size="15" font-family="Geist Mono, ui-monospace, SFMono-Regular, Consolas, monospace">Files</text>
+      </g>
+      <g>
+        <rect x="14" y="108" width="126" height="53" fill="#000"/>
+        <text x="20" y="131" fill="#ededed" font-size="19" font-weight="500">Phones</text>
+        <text x="20" y="153" fill="#737373" font-size="15" font-family="Geist Mono, ui-monospace, SFMono-Regular, Consolas, monospace">Cameras</text>
+      </g>
+      <g>
+        <rect x="14" y="188" width="126" height="53" fill="#000"/>
+        <text x="20" y="211" fill="#ededed" font-size="19" font-weight="500">PCs</text>
+        <text x="20" y="233" fill="#737373" font-size="15" font-family="Geist Mono, ui-monospace, SFMono-Regular, Consolas, monospace">Compute</text>
+      </g>
+      <g>
+        <rect x="14" y="268" width="126" height="53" fill="#000"/>
+        <text x="20" y="291" fill="#ededed" font-size="19" font-weight="500">People</text>
+        <text x="20" y="313" fill="#737373" font-size="15" font-family="Geist Mono, ui-monospace, SFMono-Regular, Consolas, monospace">Approval</text>
+      </g>
 
-      <rect x="278.5" y="111.5" width="320" height="127" rx="0" fill="#0a0a0a" stroke="#ededed"/>
+      <rect x="279" y="112" width="360" height="126" rx="0" fill="#0a0a0a" stroke="#ededed" stroke-width="2"/>
       <text x="308" y="158" fill="#8f8f8f" font-size="17">Compiled at runtime</text>
       <text x="308" y="202" fill="#ededed" font-size="28" font-weight="500">WebMCP tool</text>
-
-      <line x1="598" y1="175" x2="642" y2="175" stroke="#444"/>
-      <text x="660" y="183" fill="#8f8f8f" font-size="18" font-family="Geist Mono, ui-monospace, SFMono-Regular, Consolas, monospace">v1 → v2</text>
     </g>
 
     <line x1="88" y1="482.5" x2="1512" y2="482.5" stroke="#262626"/>
