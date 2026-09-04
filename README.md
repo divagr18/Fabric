@@ -145,7 +145,7 @@ You can test Fabric across two physical devices (such as a laptop and phone) or 
 * An OpenAI API key (for the planner)
 
 ```sh
-git clone https://github.com/divagr18/fabric.git
+git clone https://github.com/divagr18/Fabric.git
 cd fabric
 npm install
 
