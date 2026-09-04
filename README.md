@@ -37,16 +37,16 @@ Every device in the mesh contributes its natural strengths, sandboxed by explici
 Most agent architectures treat human interaction as an unhandled error state, forcing the model to abort and dump raw text back to the chat. Fabric treats humans as native execution nodes inside the WebMCP DAG:
 
 * **Interactive Real-World Capture:** The agent can delegate a physical task mid-pipeline. The tool sends a `human.request` to a connected phone or tablet, prompting the user with a live camera viewfinder to photograph a physical paper form.
-* **On-Device Processing:** The captured image is immediately processed on that device via in-browser Tesseract.js Web Workers, extracting text before returning data to the host.
-* **Explicit Approval Gates:** High-stakes actions (such as generating signed PDFs or moving financial records) require human sign-off. The pipeline halts at a verification modal, displaying extracted metadata. Only when the user taps Approve does the tool finish execution.
+* **On-Device Processing:** User-selected digital documents can be processed on the contributing device via in-browser Tesseract.js Web Workers. A newly captured physical document moves peer-to-peer to the host for assembly.
+* **Explicit Approval Gates:** Final PDF export requires human sign-off. The pipeline halts at a verification modal. Only when the user taps Approve does the tool finish execution.
 * **Zero Disruption:** The human collaborates inside the live tool execution loop without breaking conversational turn state.
 
 ## Two Demonstrated Workflows
 
-### 1. Zero-Cloud Photo Search & Self-Healing Failover
+### 1. Local-First Photo Search & Self-Healing Failover
 1. **Goal & Inspection:** You ask ChatGPT to search photos across your devices. The agent calls `inspect_fabric` to inspect connected nodes and their explicitly shared capabilities.
 2. **Tool Compilation:** Fabric compiles a brand-new tool, `search_shared_photos`, directly from the active capability graph. After validating the pipeline dependencies and device leases, Fabric exposes the compiled tool to the agent via `document.modelContext.registerTool()`.
-3. **Local-First P2P Execution:** The phone runs an on-device quantized CLIP vision model in WASM, computing embeddings locally. Your full-resolution camera roll never leaves the device. Only compact vector scores travel over WebRTC DataChannels for host-side ranking, followed by the winning thumbnail preview.
+3. **Local-First P2P Execution:** The phone runs an on-device quantized CLIP vision model in WASM, computing embeddings locally. Your source photos remain on the device. Only compact vectors travel over WebRTC DataChannels for host-side ranking, followed by the selected preview moving peer-to-peer to the host.
 4. **Self-Healing Failover (Hot-Swap):** When a device disconnects mid-session, Fabric detects the dropped node, aborts the previous registration via `AbortController`, re-compiles Version 2 of the tool around the surviving hardware, and hot-swaps it under the exact same tool name and schema. The agent continues the conversation uninterrupted.
 
 ### 2. Human-in-the-Loop Document Assembly
@@ -59,7 +59,7 @@ Most agent architectures treat human interaction as an unhandled error state, fo
 
 Most WebMCP applications expose a static list of developer-defined tools. Fabric uses WebMCP as a **dynamic runtime compilation target**:
 
-* **Just-In-Time Synthesis:** Tools are synthesized on demand based on what hardware and people are in the room.
+* **Runtime Tool Compilation:** Tools are compiled on demand based on what hardware and people are in the room.
 * **Stable Interface during Failover:** Replacing an active pipeline using an `AbortController` allows hot-swapping implementations without changing the tool name or schema, preventing agent errors.
 * **Browser as Permission Sandbox:** The agent never gets raw operating system access. It interacts exclusively with explicit browser grants (`data.read`, `compute.embed`, `human.request`).
 * **Dynamic Discovery:** Agents discover newly compiled tools in the same turn via the browser's `toolchange` lifecycle.
@@ -73,9 +73,7 @@ document.modelContext.registerTool({
   name: pipeline.toolName,
   description: pipeline.description,
   inputSchema: pipeline.inputSchema,
-  execute: async (input) => {
-    return await executeCompiledDag(pipeline.toolName, input);
-  },
+  execute: async (input) => { /* run the validated cross-device pipeline */ },
 }, { signal: controller.signal });
 ```
 
@@ -94,19 +92,19 @@ document.modelContext.registerTool({
 ## Cloudflare Edge Architecture
 
 * **Durable Objects:** Each room is anchored by a Durable Object that manages room membership, WebRTC SDP signaling, and persistent tool definitions across host reloads.
-* **WebSocket Hibernation:** Idle rooms evict active compute while preserving client WebSockets, keeping dormant rooms parked at the edge for near-zero cost.
-* **Direct P2P with Relay Fallback:** WebRTC DataChannels stream binary tensors and images directly between browsers. If symmetric NATs block direct connections, the Durable Object acts as an encrypted fallback relay.
-* **Streaming Model Proxy:** The Worker reverse-proxies model shards with strict same-origin headers required by browser WebGPU timers.
+* **WebSocket Hibernation:** Idle rooms evict active compute while preserving client WebSockets, keeping dormant rooms parked at the edge with almost no idle compute cost.
+* **Direct P2P with Relay Fallback:** WebRTC DataChannels stream binary tensors and images directly between browsers. If a direct connection cannot open, the Durable Object acts as a fallback relay.
+* **Streaming Model Proxy:** The Worker reverse-proxies model shards with the CORS headers required for browser loading and caches them at the edge.
 
 ## Measured on Real Hardware
 
 | Operation | Environment | Observed Result |
 |---|---|---|
 | CLIP Embed (small batch) | Warm WebGPU Desktop (fp16) | 1.6 - 2.1 seconds |
-| OCR Extraction | Tesseract Worker Mobile (WASM) | 1.2 seconds |
+| OCR Extraction | In-browser Tesseract worker | 1.2 seconds |
 | Planner Synthesis | Cloudflare Worker / OpenAI | 10 - 20 seconds |
 | Topology Replan (Hot-swap) | Cloudflare Worker / OpenAI | ~6 seconds |
-| First-time Model Delivery | Edge-cached streaming proxy | ~89 MB (cached indefinitely) |
+| First-time Model Delivery | Edge-cached streaming proxy | ~88 MB q8 or ~170 MB fp16, cached after first load |
 | Node Loss Detection | Heartbeat roster monitor | < 5 seconds |
 
 ## Testing Instructions for Hackathon Judges
@@ -121,11 +119,11 @@ You can test Fabric across two physical devices (such as a laptop and phone) or 
 5. **Test Local-First Execution:** Once the tool registers via WebMCP, prompt:
    > Find the photo of the dog.
 
-   *Observe:* The phone embeds the photos locally via WASM and streams vector scores over WebRTC. The source photos never leave the device.
+   *Observe:* The phone embeds the photos locally via WASM and streams vectors over WebRTC. Only the selected preview then moves peer-to-peer to the host.
 6. **Test Human-in-the-Loop (HITL) Workflow:** Prompt the agent:
-   > Compile and sign the document packet.
+   > Compile the document packet.
 
-   *Observe:* The agent initiates the pipeline, sends an interactive capture prompt to the mobile screen to photograph a paper receipt, runs on-device OCR, and halts at an interactive approval gate on your host screen before generating the final PDF.
+   *Observe:* The agent initiates the pipeline, sends an interactive capture prompt to the mobile screen, receives the photo peer-to-peer, and halts at an interactive approval gate on your host screen before generating the final PDF. User-selected digital documents can also be processed with OCR in the browser.
 
 ## Where to Look in the Code
 
@@ -143,7 +141,7 @@ You can test Fabric across two physical devices (such as a laptop and phone) or 
 ## Run Locally
 
 ### Prerequisites
-* Node.js 18+
+* Node.js 20.19+ or 22.12+
 * An OpenAI API key (for the planner)
 
 ```sh
@@ -152,7 +150,7 @@ cd fabric
 npm install
 
 # 1. Start Cloudflare Worker (port 8787)
-# Create worker/.dev.vars with: OPENAI_API_KEY="your-key"
+# Create .dev.vars in the repository root with: OPENAI_API_KEY="your-key"
 npm run dev:worker
 
 # 2. Start Vite Frontend (port 5173, proxies /api to Worker)
@@ -170,10 +168,10 @@ npx tsx tests/plan.smoke.ts
 
 ## Known Limitations
 
-* **Room Credentials:** A 4-digit room code serves as the ephemeral room credential for this hackathon build.
+* **Room Credentials:** A 4-character room code serves as the ephemeral room credential for this hackathon build.
 * **Strict Permission Boundaries:** A device exposes only files, cameras, and compute that its user explicitly grants. Fabric cannot inspect unshared directories, background tabs, or system files.
 * **Closed Primitive Vocabulary:** Compiled tools execute Fabric's typed primitives; the planner cannot execute unvalidated, arbitrary JavaScript strings.
-* **First-Run Model Download:** Loading client-side vision models requires an initial ~89 MB download per device, which is subsequently cached by the browser Cache API.
+* **First-Run Model Download:** Loading the client-side vision model requires an initial download of roughly 88 MB for q8 or 170 MB for fp16, which is subsequently cached by the browser.
 
 ## License
 
